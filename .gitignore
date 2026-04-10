@@ -1,8 +1,5 @@
 # Dependencies
 node_modules/
-package-lock.json
-yarn.lock
-pnpm-lock.yaml
 
 # Build output
 dist/
@@ -10,18 +7,21 @@ dist-ssr/
 *.local
 
 # Environment variables
-.env
 .env.local
 .env.*.local
 
-# Editor and IDE
+# Package manager lockfiles
+# Commit package-lock.json for npm to ensure reproducible installs.
+# Ignore yarn/pnpm locks only if they are not used in this project.
+yarn.lock
+pnpm-lock.yaml
+
+# Editor and IDE files
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
-.DS_Store
-Thumbs.db
 
 # Logs
 npm-debug.log*

@@ -1,18 +1,19 @@
 import React, { useState, useEffect, useRef } from "react";
-import Sidebar from "./components/Sidebar";
-import Header from "./components/Header";
-import StatRow from "./components/Dashboard/StatRow";
-import ModulesList from "./components/Dashboard/ModulesList";
-import TerminalView from "./components/Dashboard/TerminalView";
-import FindingsTable from "./components/Dashboard/FindingsTable";
-import { LOGS } from "./data/mockData";
+import { Sidebar } from "./components/layout/Sidebar";
+import { Header } from "./components/layout/Header";
+import Dashboard  from "./views/Dashboard";
+import Recon from "./views/Recon";
+import Scan from "./views/Scan";
+import Exploit from "./views/Exploit";
+import Report from "./views/Report";
+import { LOGS } from "./data/constants";
 
 export default function App() {
-  const [active, setActive]       = useState("dashboard");
-  const [target, setTarget]       = useState("");
-  const [scanning, setScanning]   = useState(false);
-  const [logIdx, setLogIdx]       = useState(LOGS.length);
-  const [visLogs, setVisLogs]     = useState(LOGS);
+  const [active, setActive] = useState("dashboard");
+  const [target, setTarget] = useState("");
+  const [scanning, setScanning] = useState(false);
+  const [logIdx, setLogIdx] = useState(LOGS.length);
+  const [visLogs, setVisLogs] = useState(LOGS);
   const [collapsed, setCollapsed] = useState(false);
   const termRef = useRef(null);
 
@@ -40,37 +41,18 @@ export default function App() {
   }, [visLogs]);
 
   return (
-    <div style={{ display:"flex", height:"100vh", overflow:"hidden", position:"relative" }}>
-      {/* scanline effect */}
-      <div style={{ position:"fixed", inset:0, pointerEvents:"none", zIndex:99,
-        background:"repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,.03) 2px,rgba(0,0,0,.03) 4px)" }}/>
-
-      <Sidebar 
-        active={active} 
-        setActive={setActive} 
-        collapsed={collapsed} 
-        setCollapsed={setCollapsed} 
-      />
-
-      {/* MAIN */}
-      <main style={{ flex:1, display:"flex", flexDirection:"column", overflow:"hidden", minWidth:0 }}>
-        <Header 
-          target={target} 
-          setTarget={setTarget} 
-          startScan={startScan} 
-          scanning={scanning} 
-        />
-
-        {/* content */}
-        <div style={{ flex:1, overflow:"auto", padding:24, display:"flex", flexDirection:"column", gap:20 }}>
-          <StatRow />
-          
-          <div style={{ display:"grid", gridTemplateColumns:"1fr 1.3fr", gap:16, minHeight:0 }}>
-            <ModulesList />
-            <TerminalView termRef={termRef} visLogs={visLogs} scanning={scanning} />
-          </div>
-
-          <FindingsTable />
+    <div style={{ display: "flex", height: "100vh", overflow: "hidden" }}>
+      <div style={{ position: "fixed", inset: 0, pointerEvents: "none", zIndex: 99,
+        background: "repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,.025) 2px,rgba(0,0,0,.025) 4px)" }} />
+      <Sidebar active={active} setActive={setActive} collapsed={collapsed} setCollapsed={setCollapsed} />
+      <main style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", minWidth: 0 }}>
+        <Header active={active} target={target} setTarget={setTarget} startScan={startScan} scanning={scanning} />
+        <div style={{ flex: 1, overflowY: "auto" }}>
+          {active === "dashboard" && <Dashboard scanning={scanning} visLogs={visLogs} termRef={termRef} />}
+          {active === "recon" && <Recon />}
+          {active === "scan" && <Scan />}
+          {active === "exploit" && <Exploit />}
+          {active === "report" && <Report />}
         </div>
       </main>
     </div>

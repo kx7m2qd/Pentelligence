@@ -12,16 +12,23 @@ export default function App() {
   const [active, setActive] = useState("dashboard");
   const [target, setTarget] = useState("");
   const [scanning, setScanning] = useState(false);
+  const [currentScanId, setCurrentScanId] = useState(null);
   const [logIdx, setLogIdx] = useState(LOGS.length);
   const [visLogs, setVisLogs] = useState(LOGS);
   const [collapsed, setCollapsed] = useState(false);
   const termRef = useRef(null);
 
-  const startScan = () => {
+  const startScan = async () => {
     if (!target.trim()) return;
     setScanning(true);
-    setVisLogs([]);
-    setLogIdx(0);
+    const res = await fetch("http://localhost:3001/api/recon/start", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ target })
+    });
+    const { scanId } = await res.json();
+    setCurrentScanId(scanId);
+    setActive("recon"); // auto-navigate to recon view
   };
 
   useEffect(() => {
@@ -49,7 +56,7 @@ export default function App() {
         <Header active={active} target={target} setTarget={setTarget} startScan={startScan} scanning={scanning} />
         <div style={{ flex: 1, overflowY: "auto" }}>
           {active === "dashboard" && <Dashboard scanning={scanning} visLogs={visLogs} termRef={termRef} />}
-          {active === "recon" && <Recon />}
+          {active === "recon" && <Recon scanId={currentScanId} />}
           {active === "scan" && <Scan />}
           {active === "exploit" && <Exploit />}
           {active === "report" && <Report />}

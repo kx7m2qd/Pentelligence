@@ -1,46 +1,5 @@
-# Dependencies
-node_modules/
-
-# Build output
-dist/
-dist-ssr/
-*.local
-
-# Environment variables
-.env.local
-.env.*.local
-
-# Package manager lockfiles
-# Commit package-lock.json for npm to ensure reproducible installs.
-# Ignore yarn/pnpm locks only if they are not used in this project.
-yarn.lock
-pnpm-lock.yaml
-
-# Editor and IDE files
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-
-# Logs
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-
-# OS files
+node_modules
+dist
+data/*.db
+.env
 .DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
-
-# Temp files
-*.tmp
-*.temp
-.cache/
-
-# Testing
-coverage/

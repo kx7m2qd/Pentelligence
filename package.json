@@ -7,14 +7,24 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "server": "nodemon --watch server server/index.js",
+    "start": "concurrently \"npm run server\" \"npm run dev\""
   },
   "dependencies": {
+    "better-sqlite3": "^12.8.0",
+    "concurrently": "^9.2.1",
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.1",
+    "execa": "^9.6.1",
+    "express": "^5.2.1",
     "react": "^19.2.4",
-    "react-dom": "^19.2.4"
+    "react-dom": "^19.2.4",
+    "xml2js": "^0.6.2"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",
+    "@types/node": "^25.6.0",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.1",
@@ -22,6 +32,7 @@
     "eslint-plugin-react-hooks": "^7.0.1",
     "eslint-plugin-react-refresh": "^0.5.2",
     "globals": "^17.4.0",
+    "nodemon": "^3.1.14",
     "vite": "^8.0.4"
   }
 }

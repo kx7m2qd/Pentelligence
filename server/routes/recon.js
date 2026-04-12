@@ -2,6 +2,7 @@ import express from 'express';
 import db from '../db.js';
 import { runNmap } from '../modules/nmap.js';
 import { runSubfinder } from '../modules/subfinder.js';
+import { runAgentLoop } from '../modules/agent.js';
 
 const router = express.Router();
 
@@ -21,6 +22,13 @@ router.post('/start', async (req, res) => {
   try {
     await runSubfinder(target, scanId);
     await runNmap(target, scanId);
+
+    // auto-trigger Groq agent after recon completes
+    runAgentLoop(scanId, msg => {
+      db.prepare("INSERT INTO agent_logs (scan_id, type, content) VALUES (?, ?, ?)")
+        .run(scanId, "log", msg);
+    });
+
     db.prepare('UPDATE scans SET status = ? WHERE id = ?')
       .run?.('done', scanId);
   } catch (err) {
@@ -65,6 +73,8 @@ router.get('/scans', (req, res) => {
 router.delete('/scan/:scanId', (req, res) => {
   const { scanId } = req.params;
   db.prepare('DELETE FROM ports WHERE host_id IN (SELECT id FROM hosts WHERE scan_id = ?)').run(scanId);
+  db.prepare('DELETE FROM findings WHERE scan_id = ?').run(scanId);
+  db.prepare('DELETE FROM agent_logs WHERE scan_id = ?').run(scanId);
   db.prepare('DELETE FROM hosts WHERE scan_id = ?').run(scanId);
   db.prepare('DELETE FROM subdomains WHERE scan_id = ?').run(scanId);
   db.prepare('DELETE FROM scans WHERE id = ?').run(scanId);

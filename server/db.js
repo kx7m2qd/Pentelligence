@@ -45,6 +45,33 @@ db.exec(`
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (scan_id) REFERENCES scans(id)
   );
+
+  CREATE TABLE IF NOT EXISTS findings (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    scan_id     INTEGER,
+    host_id     INTEGER,
+    cve_id      TEXT,
+    title       TEXT,
+    service     TEXT,
+    port        INTEGER,
+    score       REAL,
+    severity    TEXT,
+    description TEXT,
+    exploitable INTEGER DEFAULT 0,
+    created_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (scan_id) REFERENCES scans(id),
+    FOREIGN KEY (host_id) REFERENCES hosts(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS agent_logs (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    scan_id    INTEGER,
+    host_id    INTEGER,
+    type       TEXT,
+    content    TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (scan_id) REFERENCES scans(id)
+  );
 `);
 
 export default db;

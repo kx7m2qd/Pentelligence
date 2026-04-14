@@ -25,23 +25,43 @@ export default function Dashboard({ scanning, setScanning, termRef, scanId }) {
         setStats(statusData.stats || { hostsFound: 0, openPorts: 0, subdomainsFound: 0 });
         setScanStatus(statusData.scan?.status);
 
-        // fetch agent logs
+        // fetch agent + nuclei logs
         const logsRes = await fetch(`${API}/agent/logs/${scanId}`);
         const logsData = await logsRes.json();
-        setLogs(logsData.logs?.filter(l => l.type === "log").map(l => l.content) || []);
+        // show all log types in the terminal
+        setLogs(
+          (logsData.logs || [])
+            .filter(l => l.type === 'log' || l.type === 'nuclei-log')
+            .map(l => l.content)
+        );
 
-        // fetch findings
+        // fetch Groq findings
         const findingsRes = await fetch(`${API}/agent/findings/${scanId}`);
         const findingsData = await findingsRes.json();
-        setFindings(findingsData.findings || []);
+
+        // fetch nuclei confirmed findings and merge
+        try {
+          const nucRes  = await fetch(`${API}/nuclei/findings/${scanId}`);
+          const nucData = await nucRes.json();
+          const nucFindings = (nucData.findings || []).map(f => ({
+            ...f,
+            title:    f.name,
+            score:    f.cvss_score,
+            severity: f.severity,
+            source:   'nuclei',
+          }));
+          setFindings([...(findingsData.findings || []), ...nucFindings]);
+        } catch {
+          setFindings(findingsData.findings || []);
+        }
 
         // fetch decision
         const decRes = await fetch(`${API}/agent/decision/${scanId}`);
         const decData = await decRes.json();
         setDecision(decData.decision);
 
-        // auto-stop scanning indicator when scan is done and agent has completed
-        if (statusData.scan?.status === "done" && logsData.logs?.some(l => l.content?.includes("Agent loop complete"))) {
+        // auto-stop when fully done
+        if (statusData.scan?.status === "done" || statusData.scan?.status === "error") {
           setScanning(false);
         }
       } catch (err) {
@@ -64,14 +84,17 @@ export default function Dashboard({ scanning, setScanning, termRef, scanId }) {
 
   // derive module statuses from logs
   const hasSubfinder = logs.some(l => l.includes("subfinder") || l.includes("Subdomain"));
-  const hasNmap = logs.some(l => l.includes("nmap") || l.includes("Port scan") || l.includes("hosts"));
-  const hasAgent = logs.some(l => l.includes("Groq") || l.includes("Agent"));
-  const agentDone = logs.some(l => l.includes("Agent loop complete"));
+  const hasNmap      = logs.some(l => l.includes("nmap") || l.includes("Port scan") || l.includes("hosts"));
+  const hasAgent     = logs.some(l => l.includes("Groq") || l.includes("Agent"));
+  const agentDone    = logs.some(l => l.includes("Agent loop complete"));
+  const hasNuclei    = logs.some(l => l.includes("nuclei") || l.includes("Nuclei"));
+  const nucleiDone   = logs.some(l => l.includes("Nuclei scan complete"));
 
   const MODS = [
     { label: "Subdomain enum", status: scanId ? (hasSubfinder ? "done" : (scanning ? "running" : "pending")) : "pending" },
     { label: "Port scan",      status: scanId ? (hasNmap ? "done" : (hasSubfinder && scanning ? "running" : "pending")) : "pending" },
     { label: "Groq AI agent",  status: scanId ? (agentDone ? "done" : (hasAgent ? "running" : "pending")) : "pending" },
+    { label: "Nuclei scanner", status: scanId ? (nucleiDone ? "done" : (hasNuclei ? "running" : "pending")) : "pending" },
   ];
 
   const doneCount = MODS.filter(m => m.status === "done").length;

@@ -72,6 +72,25 @@ db.exec(`
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (scan_id) REFERENCES scans(id)
   );
+
+  CREATE TABLE IF NOT EXISTS nuclei_findings (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    scan_id     INTEGER,
+    host_id     INTEGER,
+    template_id TEXT,
+    name        TEXT,
+    severity    TEXT,
+    cvss_score  REAL    DEFAULT 0,
+    cve_id      TEXT,
+    description TEXT,
+    matched_at  TEXT,
+    curl_cmd    TEXT,
+    confirmed   INTEGER DEFAULT 1,
+    source      TEXT    DEFAULT 'nuclei',
+    created_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (scan_id) REFERENCES scans(id),
+    FOREIGN KEY (host_id) REFERENCES hosts(id)
+  );
 `);
 
 export default db;

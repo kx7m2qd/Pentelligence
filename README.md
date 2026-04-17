@@ -1,300 +1,387 @@
-# Pentelligence
-
-> AI-powered automated penetration testing engine built with Node.js, React, and Claude API.
-
-![License](https://img.shields.io/badge/license-MIT-green)
-![Status](https://img.shields.io/badge/status-active--development-orange)
-![Branch](https://img.shields.io/badge/branch-feat%2Frecon--engine-blue)
-
----
-
-## What is this
-
-Pentelligence is a full-stack automated pentest platform that combines traditional security tooling (nmap, subfinder, nuclei, sqlmap) with an AI agent layer powered by Claude. The AI reasons over scan output, matches CVEs to fingerprints, generates targeted payloads, and writes human-readable reports — all from a single dashboard.
-
----
-
-## Architecture
+<div align="center">
 
 ```
-Target
-  │
-  ▼
-Recon (nmap + subfinder)
-  │
-  ▼
-Fingerprint DB (SQLite)
-  │
-  ├──► Claude Agent  →  CVE matching + next action decisions
-  │
-  ▼
-Scan (nuclei templates)
-  │
-  ▼
-Exploit Engine (sqlmap + playwright + custom payloads)
-  │
-  ▼
-Report Generator (Claude + pdfkit)
+██████╗ ███████╗███╗   ██╗████████╗███████╗██╗     ██╗     ██╗ ██████╗ ███████╗███╗   ██╗ ██████╗███████╗
+██╔══██╗██╔════╝████╗  ██║╚══██╔══╝██╔════╝██║     ██║     ██║██╔════╝ ██╔════╝████╗  ██║██╔════╝██╔════╝
+██████╔╝█████╗  ██╔██╗ ██║   ██║   █████╗  ██║     ██║     ██║██║  ███╗█████╗  ██╔██╗ ██║██║     █████╗
+██╔═══╝ ██╔══╝  ██║╚██╗██║   ██║   ██╔══╝  ██║     ██║     ██║██║   ██║██╔══╝  ██║╚██╗██║██║     ██╔══╝
+██║     ███████╗██║ ╚████║   ██║   ███████╗███████╗███████╗██║╚██████╔╝███████╗██║ ╚████║╚██████╗███████╗
+╚═╝     ╚══════╝╚═╝  ╚═══╝   ╚═╝   ╚══════╝╚══════╝╚══════╝╚═╝ ╚═════╝ ╚══════╝╚═╝  ╚═══╝ ╚═════╝╚══════╝
+```
+
+### *AI-powered penetration testing. From recon to report — fully automated.*
+
+<br/>
+
+[![Live Demo](https://img.shields.io/badge/🔐_Live_Demo-Try_Pentelligence-red?style=for-the-badge)](#)
+[![Claude AI](https://img.shields.io/badge/Agent-Claude_API-blueviolet?style=for-the-badge&logo=anthropic)](https://anthropic.com)
+[![Node.js](https://img.shields.io/badge/Backend-Node.js-339933?style=for-the-badge&logo=node.js)](https://nodejs.org)
+[![Status](https://img.shields.io/badge/Status-Active_Development-orange?style=for-the-badge)](#)
+[![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)](LICENSE)
+
+<br/>
+
+> **A senior pentester takes days to go from recon to report.**  
+> *Pentelligence does it in minutes — and writes the report too.*
+
+<br/>
+
+![Pentelligence Dashboard Preview](https://raw.githubusercontent.com/yourusername/pentelligence/main/docs/assets/dashboard-preview.gif)
+
+</div>
+
+---
+
+## ✦ What Is Pentelligence?
+
+Pentelligence is a **full-stack AI-powered penetration testing platform** that automates the entire pentest lifecycle — from initial reconnaissance to exploit execution to client-ready PDF report — using a Claude AI agent loop at its core.
+
+It doesn't just run tools. It **reasons** over the output, matches CVEs to fingerprints, decides what to probe next, generates targeted payloads, and explains every finding in plain English — the way a seasoned security engineer would.
+
+Point it at an authorized target. Watch it think.
+
+---
+
+## ✦ The Pipeline
+
+```
+                         ┌─────────────────────┐
+  Target URL / IP  ─────►│   Recon Engine       │
+                         │  nmap · subfinder    │
+                         └────────┬────────────┘
+                                  │  open ports · subdomains · services
+                                  ▼
+                         ┌─────────────────────┐
+                         │   Fingerprint DB     │
+                         │      SQLite          │
+                         └────────┬────────────┘
+                                  │
+                    ┌─────────────▼──────────────┐
+                    │       Claude AI Agent       │
+                    │                            │
+                    │  • Maps services → CVEs     │
+                    │  • Decides next action      │
+                    │  • Generates payloads       │
+                    │  • Reasons over findings    │
+                    └──────┬──────────┬──────────┘
+                           │          │
+               ┌───────────▼──┐  ┌────▼──────────────┐
+               │ Scan Engine  │  │  Exploit Engine    │
+               │   nuclei     │  │  sqlmap · playwright│
+               │  templates   │  │  custom payloads   │
+               └───────┬──────┘  └────────┬───────────┘
+                       │                  │
+                       └────────┬─────────┘
+                                ▼
+                    ┌───────────────────────┐
+                    │    Report Generator   │
+                    │  Claude + pdfkit      │
+                    │  Human-readable PDF   │
+                    └───────────────────────┘
 ```
 
 ---
 
-## Tech Stack
+## ✦ Why This Is Different
 
-| Layer | Technology |
+Most "automated pentest tools" are just scanners with a UI slapped on top. They run nmap, dump raw output, and call it a day.
+
+Pentelligence has an **AI agent that actually thinks** between each phase:
+
+- After recon → Claude reads the port map and decides *which* nuclei templates are actually relevant for these specific services
+- After scanning → Claude maps findings to real CVE entries and ranks them by exploitability
+- Before exploiting → Claude generates targeted payloads based on the tech stack, not generic ones
+- After everything → Claude writes the report in the tone and structure a real client expects — executive summary, technical findings, remediation steps
+
+It's not a scanner. It's a reasoning loop that uses scanners as tools.
+
+---
+
+## ✦ Tech Stack
+
+| Layer | Technology | Why |
+|---|---|---|
+| Frontend | React + Vite | Fast dev, clean component model |
+| Backend | Node.js + Express | Non-blocking I/O — ideal for long-running scan processes |
+| Database | SQLite (better-sqlite3) | Zero-config persistence, fast reads, perfect for scan data |
+| AI Agent | Claude API (Anthropic) | Best-in-class reasoning, structured JSON output, large context window |
+| Recon | nmap + subfinder | Industry standard — trusted by professionals worldwide |
+| Scanning | nuclei | Template-based, maintained by ProjectDiscovery |
+| Exploitation | sqlmap + Playwright | SQL injection automation + headless browser-based attacks |
+| Reporting | pdfkit + Handlebars | Programmatic PDF generation with template engine |
+| Task Queue | p-queue | Concurrency control for parallel scan operations |
+| Process Runner | execa | Clean child process management for external tool calls |
+
+---
+
+## ✦ Features
+
+| Feature | Status |
 |---|---|
-| Frontend | React + Vite |
-| Backend | Node.js + Express |
-| Database | SQLite via better-sqlite3 |
-| AI Agent | Claude API (Anthropic) |
-| Recon | nmap, subfinder |
-| Scanning | nuclei |
-| Exploitation | sqlmap, playwright |
-| Reporting | pdfkit + handlebars |
-| Task Queue | p-queue |
-| Process runner | execa |
+| 🖥️ Full dashboard UI with live terminal output | ✅ Done |
+| 🔍 Recon view — host map + subdomain enumeration | ✅ Done |
+| 🧪 Scan view — nuclei template configuration | ✅ Done |
+| 💥 Exploit view — payload editor + output panel | ✅ Done |
+| 📄 Report view — builder + PDF export | ✅ Done |
+| ⚙️ Express backend + REST API | ✅ Done |
+| 🗄️ SQLite schema + persistence layer | ✅ Done |
+| 🛰️ nmap wrapper + XML parser | ✅ Done |
+| 🌐 subfinder subdomain wrapper | ✅ Done |
+| 🤖 Claude AI agent loop (CVE matching + decisions) | 🔄 In Progress |
+| 🔬 nuclei scanner integration + live results | 🔄 In Progress |
+| 💉 sqlmap + Playwright exploit engine | 🔄 In Progress |
+| 📑 Claude-written PDF report export | 🔄 In Progress |
+| 🧠 NVD feed ingestion + CVE vector embeddings | 📋 Planned |
 
 ---
 
-## Project Structure
+## ✦ Claude Agent — How It Thinks
+
+The AI agent loop is the core of what makes Pentelligence different from a script that runs tools.
+
+```javascript
+// Claude receives the full context at each decision point
+const agentPrompt = `
+You are a senior penetration tester.
+
+TARGET: ${target}
+OPEN PORTS: ${JSON.stringify(ports)}
+SERVICES DETECTED: ${JSON.stringify(services)}
+SUBDOMAINS FOUND: ${JSON.stringify(subdomains)}
+PRIOR FINDINGS: ${JSON.stringify(previousFindings)}
+
+Based on this fingerprint:
+1. Which CVEs are most relevant? (list with CVSS scores)
+2. What should we scan next and with which nuclei templates?
+3. What payloads should we attempt first?
+4. What is the overall risk level and why?
+
+Respond in structured JSON.
+`;
+
+// Claude returns a structured decision
+{
+  "cves": [
+    { "id": "CVE-2023-44487", "cvss": 7.5, "service": "nginx/1.18.0", "confidence": "high" },
+    { "id": "CVE-2021-41773", "cvss": 9.8, "service": "Apache/2.4.49", "confidence": "medium" }
+  ],
+  "next_action": "scan",
+  "nuclei_templates": ["http/cves/2023/CVE-2023-44487.yaml", "http/vulnerabilities/apache/"],
+  "risk_level": "critical",
+  "reasoning": "Apache version 2.4.49 is confirmed by banner grab on port 443. CVE-2021-41773 is a path traversal with known public exploits..."
+}
+```
+
+Every decision is logged. You see exactly what the agent reasoned and why it did what it did.
+
+---
+
+## ✦ Project Structure
 
 ```
 pentelligence/
 ├── server/
-│   ├── index.js              # Express server entry point
-│   ├── db.js                 # SQLite setup + schema
+│   ├── index.js                # Express entry point
+│   ├── db.js                   # SQLite schema + setup
 │   ├── routes/
-│   │   ├── recon.js          # /api/recon endpoints
-│   │   ├── scan.js           # /api/scan endpoints (coming)
-│   │   ├── exploit.js        # /api/exploit endpoints (coming)
-│   │   └── report.js         # /api/report endpoints (coming)
+│   │   ├── recon.js            # /api/recon — nmap + subfinder
+│   │   ├── scan.js             # /api/scan — nuclei runner
+│   │   ├── exploit.js          # /api/exploit — sqlmap + playwright
+│   │   └── report.js           # /api/report — Claude + pdfkit
 │   └── modules/
-│       ├── nmap.js           # nmap wrapper + XML parser
-│       ├── subfinder.js      # subfinder wrapper
-│       ├── nuclei.js         # nuclei wrapper (coming)
-│       ├── claude.js         # Claude agent loop (coming)
-│       └── report.js         # pdfkit report generator (coming)
+│       ├── nmap.js             # nmap process wrapper + XML parser
+│       ├── subfinder.js        # subfinder subprocess wrapper
+│       ├── nuclei.js           # nuclei template runner
+│       ├── claude.js           # Claude agent loop + decision engine
+│       └── report.js           # PDF report generator
+│
 ├── src/
-│   ├── App.jsx               # Root + sidebar + routing
-│   ├── main.jsx              # React entry point
-│   ├── index.css             # Global styles + CSS vars
-│   ├── components/           # Shared UI components
+│   ├── App.jsx                 # Root layout + sidebar + routing
 │   ├── views/
-│   │   ├── Dashboard.jsx     # Overview + live terminal
-│   │   ├── Recon.jsx         # Host map + subdomains
-│   │   ├── Scan.jsx          # Nuclei template config
-│   │   ├── Exploit.jsx       # Payload editor + output
-│   │   └── Report.jsx        # Report builder + export
-│   ├── data/
-│   │   └── constants.js      # Shared mock data + constants
-│   └── utils/                # Helper functions
+│   │   ├── Dashboard.jsx       # Overview + live terminal
+│   │   ├── Recon.jsx           # Host map + subdomain tree
+│   │   ├── Scan.jsx            # Template picker + live results
+│   │   ├── Exploit.jsx         # Payload editor + output console
+│   │   └── Report.jsx          # Report builder + PDF export
+│   └── components/             # Shared UI — Terminal, Badge, etc.
+│
 ├── data/
-│   └── pentest.db            # SQLite database (auto-created)
-├── .env
+│   └── pentest.db              # SQLite — auto-created on first run
+│
 ├── .env.example
 ├── vite.config.js
-├── package.json
-└── README.md
+└── package.json
 ```
 
 ---
 
-## Prerequisites
+## ✦ Getting Started
 
-Make sure these are installed before running the project.
+### Prerequisites
 
-### Required
+```bash
+node >= 18.0.0
+npm  >= 9.0.0
+```
 
-- [Node.js](https://nodejs.org/) v18+
-- [npm](https://www.npmjs.com/) v9+
-
-### Security Tools (for real scans)
+### Security Tools
 
 ```bash
 # nmap — port scanner
-# macOS
-brew install nmap
+brew install nmap          # macOS
+sudo apt install nmap      # Ubuntu / Debian
 
-# Ubuntu / Debian
-sudo apt install nmap
-
-# subfinder — subdomain enumeration
-# requires Go installed first: https://go.dev/dl/
+# subfinder — subdomain enumeration (requires Go)
 go install -v github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest
+
+# nuclei — vulnerability scanner
+go install -v github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest
+
+# Verify all installs
+nmap --version && subfinder --version && nuclei --version
 ```
 
-Verify installations:
+> **No tools?** No problem. The engine **auto-falls back to mock data** if security tools aren't installed — the full UI works during development without any of them.
+
+### Installation
 
 ```bash
-nmap --version
-subfinder --version
-```
-
-> **Note:** If these tools are not installed, the engine falls back to mock data automatically so the UI still works during development.
-
----
-
-## Getting Started
-
-### 1. Clone the repo
-
-```bash
-git clone https://github.com/YOUR_USERNAME/pentelligence.git
+# 1. Clone
+git clone https://github.com/yourusername/pentelligence.git
 cd pentelligence
-```
 
-### 2. Install dependencies
-
-```bash
+# 2. Install
 npm install
-```
 
-### 3. Set up environment variables
-
-```bash
+# 3. Environment
 cp .env.example .env
 ```
 
 Edit `.env`:
 
-```
+```env
 PORT=3001
-ANTHROPIC_API_KEY=your_claude_api_key_here
+ANTHROPIC_API_KEY=sk-ant-...
 ```
 
-### 4. Run the app
+### Run
 
 ```bash
-# Run both frontend and backend together
+# Both frontend + backend together
 npm start
 
 # Or separately
-npm run server   # backend on :3001
-npm run dev      # frontend on :5173
+npm run server    # API on :3001
+npm run dev       # UI on :5173
 ```
 
-### 5. Open in browser
-
-```
-http://localhost:5173
-```
+Open [`http://localhost:5173`](http://localhost:5173)
 
 ---
 
-## API Reference
+## ✦ API Reference
 
-### Recon
+### Recon Endpoints
 
 | Method | Endpoint | Description |
 |---|---|---|
-| POST | `/api/recon/start` | Start a new recon scan |
-| GET | `/api/recon/status/:scanId` | Get scan results |
-| GET | `/api/recon/scans` | List all past scans |
-| DELETE | `/api/recon/scan/:scanId` | Delete a scan |
-
-**Start a scan:**
+| `POST` | `/api/recon/start` | Launch recon against a target |
+| `GET` | `/api/recon/status/:scanId` | Poll scan results |
+| `GET` | `/api/recon/scans` | List all historical scans |
+| `DELETE` | `/api/recon/scan/:scanId` | Remove a scan record |
 
 ```bash
+# Start a recon scan
 curl -X POST http://localhost:3001/api/recon/start \
   -H "Content-Type: application/json" \
   -d '{"target": "scanme.nmap.org"}'
-```
 
-**Get results:**
-
-```bash
+# Poll for results
 curl http://localhost:3001/api/recon/status/1
 ```
 
-> `scanme.nmap.org` is a legal public target hosted by the nmap project for testing purposes.
+> `scanme.nmap.org` is a **legal public test host** maintained by the nmap project. Safe to use during development.
 
 ---
 
-## Development Roadmap
+## ✦ Development Roadmap
 
-| Branch | Status | Description |
+| Branch | Status | Scope |
 |---|---|---|
-| `feature/initial-setup` | ✅ merged | Full frontend scaffold — all 5 views |
-| `feat/recon-engine` | 🔄 in progress | nmap + subfinder + SQLite + REST API |
-| `feat/claude-agent` | ⬜ queued | Claude API loop — CVE matching + decisions |
-| `feat/nuclei-integration` | ⬜ queued | nuclei scanner + live results feed |
-| `feat/exploit-engine` | ⬜ queued | sqlmap + playwright + payload engine |
-| `feat/report-generator` | ⬜ queued | Claude report writer + pdfkit PDF export |
-| `feat/sqlite-db` | ⬜ queued | Full persistent DB across all modules |
-| `feat/ml-cve-pipeline` | ⬜ future | NVD feed ingestion + vector embeddings |
+| `feature/initial-setup` | ✅ Merged | Full frontend scaffold — all 5 views |
+| `feat/recon-engine` | 🔄 In Progress | nmap + subfinder + SQLite + REST API |
+| `feat/claude-agent` | ⬜ Queued | Claude AI loop — CVE matching + next-action decisions |
+| `feat/nuclei-integration` | ⬜ Queued | nuclei scanner + live streaming results |
+| `feat/exploit-engine` | ⬜ Queued | sqlmap + Playwright + custom payload generation |
+| `feat/report-generator` | ⬜ Queued | Claude-written report + pdfkit PDF export |
+| `feat/sqlite-db` | ⬜ Queued | Full persistent DB across all modules |
+| `feat/ml-cve-pipeline` | 🔮 Future | NVD feed ingestion + CVE vector embeddings |
 
 ---
 
-## Feature Status
+## ✦ Legal & Ethics
 
-| Feature | Status |
-|---|---|
-| Dashboard UI | ✅ done |
-| Recon UI | ✅ done |
-| Scan UI | ✅ done |
-| Exploit UI | ✅ done |
-| Report UI | ✅ done |
-| Express backend | ✅ done |
-| SQLite schema | ✅ done |
-| nmap wrapper | ✅ done |
-| subfinder wrapper | ✅ done |
-| Claude agent loop | 🔄 coming |
-| nuclei integration | 🔄 coming |
-| Real exploit engine | 🔄 coming |
-| PDF report export | 🔄 coming |
-| ML / CVE embeddings | 🔄 future |
+**This tool is built for authorized security testing only.**
 
----
+- ✅ Only scan targets you have **explicit written permission** to test
+- ✅ Use against your own systems, lab VMs, or legal CTF environments
+- ❌ Never run against systems you do not own or have authorization for
+- ❌ The authors bear no responsibility for misuse
 
-## Legal & Ethics
+**Legal targets for development and testing:**
 
-This tool is intended for **authorized penetration testing and security research only**.
+| Target | Type | Notes |
+|---|---|---|
+| `scanme.nmap.org` | Public host | Officially maintained by nmap project |
+| Local VMs / Docker | Self-hosted | Safest option — full control |
+| HackTheBox machines | CTF platform | Requires active subscription |
+| TryHackMe rooms | CTF platform | Many free rooms available |
 
-- Only scan targets you have **explicit written permission** to test
-- Never run this against systems you do not own or have authorization for
-- The authors are not responsible for any misuse of this software
-- Always comply with local laws and regulations regarding security testing
-
-**Safe targets for development testing:**
-
-- `scanme.nmap.org` — official nmap test host
-- Your own local VMs or lab environments
-- CTF / HackTheBox / TryHackMe machines
+Security is about protecting people. Build responsibly.
 
 ---
 
-## Contributing
+## ✦ Contributing
 
 ```bash
-# create a feature branch
-git checkout -b feat/your-feature
+# 1. Fork the repo, then clone
+git clone https://github.com/yourusername/pentelligence.git
 
-# make changes, then
-git add .
-git commit -m "feat: describe what you did"
-git push origin feat/your-feature
+# 2. Create a feature branch
+git checkout -b feat/your-feature-name
 
-# open a pull request into main
+# 3. Make your changes and commit
+git commit -m "feat: describe what you built"
+
+# 4. Push and open a PR into main
+git push origin feat/your-feature-name
 ```
 
-Commit message convention:
+**Commit convention:**
 
 | Prefix | Use for |
 |---|---|
-| `feat:` | new feature |
-| `fix:` | bug fix |
-| `refactor:` | code cleanup, no feature change |
+| `feat:` | New feature |
+| `fix:` | Bug fix |
+| `refactor:` | Code cleanup — no behaviour change |
 | `docs:` | README or comment updates |
-| `chore:` | dependency updates, config |
+| `chore:` | Deps, config, tooling |
 
 ---
 
-## License
+## ✦ License
 
-MIT — see [LICENSE](./LICENSE) for details.
+MIT — see [LICENSE](./LICENSE) for full terms.
 
 ---
 
 <div align="center">
-  Built with Claude API · nmap · subfinder · nuclei · React · Node.js
+
+**A penetration test should find what attackers would find.**  
+*Pentelligence finds it first — and explains exactly what to do about it.*
+
+<br/>
+
+Built with Claude API · nmap · subfinder · nuclei · sqlmap · React · Node.js
+
 </div>

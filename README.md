@@ -382,6 +382,6 @@ MIT — see [LICENSE](./LICENSE) for full terms.
 
 <br/>
 
-Built with Claude API · nmap · subfinder · nuclei · sqlmap · React · Node.js
+Built with  Nmap · subfinder · nuclei · sqlmap · React · Node.js
 
 </div>

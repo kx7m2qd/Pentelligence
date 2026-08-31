@@ -10,7 +10,6 @@ export default function Dashboard({ scanning, setScanning, termRef, scanId }) {
   const [logs, setLogs] = useState([]);
   const [findings, setFindings] = useState([]);
   const [stats, setStats] = useState({ hostsFound: 0, openPorts: 0, subdomainsFound: 0 });
-  const [scanStatus, setScanStatus] = useState(null);
   const [decision, setDecision] = useState(null);
 
   // poll recon status + agent logs + findings every 2s when scan is active
@@ -23,7 +22,6 @@ export default function Dashboard({ scanning, setScanning, termRef, scanId }) {
         const statusRes = await fetch(`${API}/recon/status/${scanId}`);
         const statusData = await statusRes.json();
         setStats(statusData.stats || { hostsFound: 0, openPorts: 0, subdomainsFound: 0 });
-        setScanStatus(statusData.scan?.status);
 
         // fetch agent + nuclei logs
         const logsRes = await fetch(`${API}/agent/logs/${scanId}`);
@@ -64,7 +62,7 @@ export default function Dashboard({ scanning, setScanning, termRef, scanId }) {
         if (statusData.scan?.status === "done" || statusData.scan?.status === "error") {
           setScanning(false);
         }
-      } catch (err) {
+      } catch {
         // ignore fetch errors during polling
       }
     };
@@ -77,7 +75,7 @@ export default function Dashboard({ scanning, setScanning, termRef, scanId }) {
   // auto-scroll terminal
   useEffect(() => {
     if (termRef.current) termRef.current.scrollTop = termRef.current.scrollHeight;
-  }, [logs]);
+  }, [logs, termRef]);
 
   const criticalCount = findings.filter(f => f.severity === "CRITICAL").length;
   const highCount = findings.filter(f => f.severity === "HIGH").length;

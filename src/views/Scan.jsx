@@ -208,12 +208,14 @@ export default function Scan() {
         // derive phase from latest log types
         const hasNuclei = logs.some(l => l.type === 'nuclei-log');
         const hasAgent  = logs.some(l => l.type === 'log' && l.content?.includes('Groq'));
-        const hasRecon  = logs.some(l => l.type === 'log' && l.content?.includes('[subfinder]' || '[nmap]'));
+        const hasRecon  = logs.some(l => l.type === 'log' && (l.content?.includes('[subfinder]') || l.content?.includes('[nmap]')));
 
         if (hasNuclei) setPhase('nuclei');
         else if (hasAgent) setPhase('agent');
         else if (hasRecon || logs.length) setPhase('recon');
-      } catch {}
+      } catch {
+        // Polling is best-effort while a scan is running.
+      }
     };
 
     pollLogs();

@@ -157,16 +157,13 @@ if (typeof document !== "undefined" && !document.getElementById(styleId)) {
 export default function Recon({ scanId }) {
   const [data, setData]     = useState(null);
   const [sel, setSel]       = useState(null);
-  const [loading, setLoading] = useState(false);
   const [error, setError]   = useState(null);
-  const [pollCount, setPollCount] = useState(0);
   const [elapsed, setElapsed] = useState(0);
   const timerRef = useRef(null);
 
   // poll for results every 3s while scan is running
   useEffect(() => {
     if (!scanId) return;
-    setLoading(true);
     setElapsed(0);
     setData(null);
     setSel(null);
@@ -179,16 +176,13 @@ export default function Recon({ scanId }) {
         const res = await fetch(`http://localhost:3001/api/recon/status/${scanId}`);
         const json = await res.json();
         setData(json);
-        setPollCount(c => c + 1);
 
         // stop polling & timer when scan is done
         if (json.scan?.status === "done") {
-          setLoading(false);
           clearInterval(timerRef.current);
         }
-      } catch (e) {
+      } catch {
         setError("Cannot reach server — is it running on :3001?");
-        setLoading(false);
         clearInterval(timerRef.current);
       }
     };

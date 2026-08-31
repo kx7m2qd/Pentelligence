@@ -1,5 +1,9 @@
-node_modules
-dist
+node_modules/
+dist/
 data/*.db
+reports/
 .env
+.env.*
+!.env.example
 .DS_Store
+coverage/

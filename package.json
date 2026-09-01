@@ -13,7 +13,8 @@
     "preview": "vite preview",
     "preserver": "npm rebuild better-sqlite3 --silent",
     "server": "nodemon --watch server server/index.js",
-    "start": "concurrently \"npm run server\" \"npm run dev\""
+    "start": "concurrently \"npm run server\" \"npm run dev\"",
+    "test": "node --test server/**/*.test.js"
   },
   "dependencies": {
     "better-sqlite3": "^12.8.0",

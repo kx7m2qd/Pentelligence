@@ -1,5 +1,8 @@
 import Groq from "groq-sdk";
 
+// llama-3.3 chat models were deprecated on Groq; override with GROQ_MODEL if needed.
+const GROQ_MODEL = process.env.GROQ_MODEL || "openai/gpt-oss-120b";
+
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
 const SYSTEM_PROMPT = `You are an expert penetration tester and security researcher.
@@ -38,7 +41,7 @@ Respond with this exact JSON structure:
 }`;
 
   const response = await groq.chat.completions.create({
-    model: "llama-3.3-70b-versatile",
+    model: GROQ_MODEL,
     messages: [
       { role: "system", content: SYSTEM_PROMPT },
       { role: "user",   content: prompt },
@@ -76,7 +79,7 @@ Respond with this exact JSON:
 }`;
 
   const response = await groq.chat.completions.create({
-    model: "llama-3.3-70b-versatile",
+    model: GROQ_MODEL,
     messages: [
       { role: "system", content: SYSTEM_PROMPT },
       { role: "user",   content: prompt },
@@ -125,7 +128,7 @@ Respond with this exact JSON:
 }`;
 
   const response = await groq.chat.completions.create({
-    model: "llama-3.3-70b-versatile",
+    model: GROQ_MODEL,
     messages: [
       { role: "system", content: SYSTEM_PROMPT },
       { role: "user",   content: prompt },

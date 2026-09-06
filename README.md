@@ -1,89 +1,153 @@
 # Pentelligence
 
-Pentelligence is a local, AI-assisted reconnaissance dashboard for **authorized** security testing. It combines a React/Vite interface with an Express and SQLite API that can coordinate Nmap, Subfinder, Nuclei, and Groq-based analysis.
+AI-assisted recon and vulnerability triage dashboard with real scanner integrations.
 
-> Only scan systems you own or have explicit written authorization to test. The operator is responsible for defining scope and complying with all applicable rules.
+## What Docker Solves
 
-## Current capabilities
+The app depends on external security tools:
 
-- Start and track reconnaissance scans from the dashboard.
-- Discover subdomains with Subfinder and enumerate services with Nmap.
-- Store scans, hosts, ports, agent logs, and findings in SQLite.
-- Run Groq-assisted analysis when `GROQ_API_KEY` is configured.
-- Run Nuclei scans and view confirmed findings.
+- `subfinder` for subdomain discovery
+- `nmap` for port and service detection
+- `nuclei` for vulnerability confirmation
+- `sqlmap` for optional SQL injection checks
 
-The external tools are optional during development: missing tools are reported by the application rather than installed automatically.
+Without Docker, every laptop must install those tools manually. With Docker, the image bundles them, so a new user only needs Docker and a `.env` file.
 
-## Requirements
+## Quick Start With Docker
 
-- Node.js 22.12 or newer (`.nvmrc` pins the baseline version).
-- npm 10 or newer.
-- Optional scanner tools: Nmap, Subfinder, and Nuclei.
-- A Groq API key only if AI-assisted analysis is required.
-
-## Local setup
+1. Copy the environment template:
 
 ```bash
-git clone https://github.com/kx7m2qd/Pentelligence.git
-cd Pentelligence
-npm ci
 cp .env.example .env
 ```
 
-Set only the values you need in `.env`; never commit it. At minimum, the server uses `PORT=3001`. Add `GROQ_API_KEY` to enable AI analysis.
+2. Configure deployment access in `.env`:
 
-Run the frontend and API together:
+```bash
+APP_PASSWORD=optional-local-access-gate
+GROQ_API_KEY=your_key_here
+```
+
+3. Start the full app:
+
+```bash
+docker compose up --build
+```
+
+4. Open:
+
+```text
+http://localhost:3001
+```
+
+The React app and API are served from the same container on port `3001`.
+
+If port `3001` is already busy:
+
+```bash
+APP_PORT=3015 docker compose up --build
+```
+
+Then open `http://localhost:3015`.
+
+## Data Persistence
+
+Docker Compose creates named volumes:
+
+- `pentelligence-data` keeps `data/pentest.db`
+- `nuclei-templates` keeps Nuclei template data
+
+Stopping the container does not delete scan history.
+
+## Local Development
+
+Use Node.js 22.12 or later (the repository includes `.nvmrc` for version managers that support it).
+
+Install dependencies:
+
+```bash
+npm install
+```
+
+Run the dev frontend and backend:
+
+```bash
+npm run dev:all
+```
+
+Open:
+
+```text
+http://localhost:5173
+```
+
+For local development without Docker, your machine must have scanner tools installed and available in `PATH`.
+
+## Production Run Without Docker
+
+Build the frontend:
+
+```bash
+npm run build
+```
+
+Start the production server:
 
 ```bash
 npm start
 ```
 
-Open <http://localhost:5173>. The API runs on <http://localhost:3001>.
+Open:
+
+```text
+http://localhost:3001
+```
+
+## Environment
+
+Important `.env` values:
+
+- `GROQ_API_KEY`: enables AI analysis and report generation.
+- `APP_PASSWORD`: optional local access gate. It protects the web UI with server-side sessions and is never sent to the browser.
+- `SESSION_TTL_HOURS`: how long a signed-in browser may access the application.
+- `ALLOW_PRIVATE_TARGETS`: keep `false` unless you intentionally scan private/internal ranges.
+- `MAX_CONCURRENT_SCANS`: hard cap on active scanner tasks. Keep this low on a small host.
+- `DISCORD_WEBHOOK_URL`: optional server-side Discord webhook for scan completion/failure notifications.
+
+Programs are managed from the `Programs` screen. Use one exact rule for a single asset or a wildcard such as `*.example.com` for approved subdomains; exclusions always win. A selected program is attached to the scan record and discovered subdomains outside its rules are filtered before Nmap runs.
+- `APP_PORT`: host port used by Docker Compose.
+- `NUCLEI_VERSION` and `SUBFINDER_VERSION`: use `latest` or pin exact versions for reproducible images.
+
+## Scanner Notes
+
+Docker scans from inside the container network namespace. Public targets work normally. For local/private networks, routing and Docker Desktop network behavior can differ from a native host scan.
+
+The compose file grants `NET_RAW` and `NET_ADMIN` to support deeper scanner behavior if scan profiles are expanded later.
 
 ## Verification
 
-Before opening a pull request, run:
+Run:
 
 ```bash
 npm run lint
+npm test
 npm run build
 ```
 
-Run these checks locally before opening a pull request; the pull-request template records the results.
+When Docker is running, verify:
 
-## API overview
-
-| Method | Endpoint | Purpose |
-| --- | --- | --- |
-| `GET` | `/api/health` | Check API availability and Groq configuration status. |
-| `POST` | `/api/recon/start` | Start an authorized recon scan with `{ "target": "example.com" }`. |
-| `GET` | `/api/recon/status/:scanId` | Read scan status, hosts, ports, and subdomains. |
-| `GET` | `/api/recon/scans` | List prior scans. |
-| `DELETE` | `/api/recon/scan/:scanId` | Delete a scan and its related records. |
-| `POST` | `/api/agent/run/:scanId` | Start Groq-assisted analysis for an existing scan. |
-| `GET` | `/api/agent/findings/:scanId` | Read AI-generated findings. |
-| `POST` | `/api/nuclei/run/:scanId` | Start Nuclei against hosts in an existing scan. |
-| `GET` | `/api/nuclei/findings/:scanId` | Read confirmed Nuclei findings. |
-
-## Contributing workflow
-
-1. Start from updated `main` and create one focused branch: `feat/...`, `fix/...`, `docs/...`, or `chore/...`.
-2. Keep each pull request scoped to one purpose and describe the user-facing impact.
-3. Update documentation when behavior, configuration, or an API contract changes.
-4. Run the verification commands above and state the results in the pull request.
-5. Never commit secrets, scanner output, SQLite data, `node_modules`, or built `dist` assets.
-
-Use conventional commit prefixes: `feat:`, `fix:`, `docs:`, `refactor:`, `test:`, and `chore:`.
-
-## Repository structure
-
-```text
-src/                 React dashboard
-server/              Express API, database, routes, scanner/AI modules
-.env.example         Safe environment-variable template
-.github/workflows/   Continuous-integration checks
+```bash
+curl http://localhost:3001/api/health
+curl http://localhost:3001/api/health/tools
 ```
 
-## Security note
+## Production Checklist
 
-Treat scanner results, target names, and access credentials as sensitive. Keep production API keys in local environment variables or a secrets manager; rotate a key immediately if it is exposed.
+- Set a unique `APP_PASSWORD` with at least 16 characters if the app is shared or exposed beyond your laptop.
+- Put the container behind an HTTPS reverse proxy and expose only the proxy port publicly.
+- Keep `ALLOW_PRIVATE_TARGETS=false` and `ENABLE_ACTIVE_EXPLOITATION=false` unless you have a documented, authorized internal-testing workflow.
+- Persist and back up the `pentelligence-data` Docker volume. It contains scan records and authorization notes.
+- Use a private image registry, pin scanner versions after validating them, and deploy updates through CI.
+- Do not share the deployment password. For a true multi-user deployment, connect the API to an identity provider before granting external access.
+
+The built-in HTTP probe records status, title, server header, content type, response size, redirect location, and response time without requiring a separate `httpx` installation. Nuclei rate limits come from the selected program profile.

@@ -1,37 +1,45 @@
 import React from 'react';
-import { NAV } from '../../data/constants';
+import { NAV, NAV_GROUPS } from '../../data/constants';
 
-export const Sidebar = ({ active, setActive, collapsed, setCollapsed }) => {
+export const Sidebar = ({ active, setActive, collapsed, setCollapsed, mobileOpen, setMobileOpen }) => {
   return (
-    <aside style={{width:collapsed?52:196,transition:"width .22s ease",background:"var(--s1)",
-      borderRight:"1px solid var(--border)",display:"flex",flexDirection:"column",flexShrink:0,overflow:"hidden"}}>
-      <div style={{padding:"18px 14px 16px",borderBottom:"1px solid var(--border)",display:"flex",alignItems:"center",gap:10}}>
-        <div style={{width:26,height:26,background:"var(--acc)",borderRadius:4,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-          <span style={{fontFamily:"var(--mono)",fontSize:13,color:"#000",fontWeight:700}}>P</span>
-        </div>
-        {!collapsed&&<span style={{fontFamily:"var(--sans)",fontSize:15,fontWeight:600,letterSpacing:"0.08em",color:"var(--t1)",whiteSpace:"nowrap"}}>
-          PENTEST<span style={{color:"var(--acc)"}}>_AI</span>
-        </span>}
+    <>
+      {mobileOpen && <button type="button" className="sidebar-scrim" aria-label="Close navigation" onClick={() => setMobileOpen(false)} />}
+      <aside className={`app-sidebar ${collapsed ? 'collapsed' : ''} ${mobileOpen ? 'mobile-open' : ''}`}>
+      <div className="sidebar-brand">
+        <div className="brand-mark">P</div>
+        {!collapsed && (
+          <span className="brand-name">PENTELLIGENCE</span>
+        )}
       </div>
-      <nav style={{flex:1,padding:"10px 6px",display:"flex",flexDirection:"column",gap:2}}>
-        {NAV.map(n=>(
-          <button key={n.id} onClick={()=>setActive(n.id)} title={n.label} style={{
-            display:"flex",alignItems:"center",gap:10,padding:"9px 10px",borderRadius:6,
-            border:"none",cursor:"pointer",transition:"all .12s",justifyContent:collapsed?"center":"flex-start",
-            background:active===n.id?"rgba(184,255,87,.1)":"transparent",
-            color:active===n.id?"var(--acc)":"var(--t2)",
-            outline:active===n.id?"1px solid rgba(184,255,87,.2)":"none"}}>
-            <span style={{fontSize:14,flexShrink:0,width:18,textAlign:"center"}}>{n.icon}</span>
-            {!collapsed&&<span style={{fontFamily:"var(--sans)",fontSize:13,fontWeight:500,letterSpacing:"0.06em",whiteSpace:"nowrap"}}>{n.label}</span>}
-          </button>
-        ))}
+      <nav className="sidebar-nav">
+        {NAV_GROUPS.map(group => {
+          const items = NAV.filter(item => item.group === group.id);
+          return (
+            <div key={group.id} className="nav-group">
+              {!collapsed && <div className="nav-group-label">{group.label}</div>}
+              {items.map(item => (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => setActive(item.id)}
+                  title={item.label}
+                  aria-current={active === item.id ? 'page' : undefined}
+                  className={`nav-item ${active === item.id ? 'active' : ''}`}
+                >
+                  <span className="nav-icon">{item.icon}</span>
+                  {!collapsed && <span className="nav-label">{item.label}</span>}
+                </button>
+              ))}
+            </div>
+          );
+        })}
       </nav>
-      <button onClick={()=>setCollapsed(c=>!c)} style={{
-        margin:"10px 6px",padding:"8px 10px",borderRadius:6,border:"1px solid var(--border)",
-        background:"transparent",color:"var(--t3)",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
-        <span style={{fontSize:11,transition:"transform .22s",transform:collapsed?"rotate(180deg)":"none"}}>◀</span>
-        {!collapsed&&<span style={{fontFamily:"var(--sans)",fontSize:11,letterSpacing:"0.05em"}}>COLLAPSE</span>}
+      <button type="button" className="sidebar-collapse" onClick={() => setCollapsed(value => !value)}>
+        <span style={{ transform: collapsed ? 'rotate(180deg)' : 'none', display: 'inline-block', transition: 'transform .22s' }}>◀</span>
+        {!collapsed && <span>Collapse</span>}
       </button>
-    </aside>
+      </aside>
+    </>
   );
 };

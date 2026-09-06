@@ -1,9 +1,44 @@
 import Groq from "groq-sdk";
+import { config } from "../config.js";
 
-// llama-3.3 chat models were deprecated on Groq; override with GROQ_MODEL if needed.
-const GROQ_MODEL = process.env.GROQ_MODEL || "openai/gpt-oss-120b";
+const groq = process.env.GROQ_API_KEY ? new Groq({ apiKey: process.env.GROQ_API_KEY }) : null;
 
-const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+function getGroq() {
+  if (!groq) throw new Error("GROQ_API_KEY is not configured");
+  return groq;
+}
+
+function isRetryable(error) {
+  const status = Number(error?.status || error?.statusCode || 0);
+  return status === 429 || status >= 500 || error?.code === 'ETIMEDOUT' || error?.code === 'ECONNRESET';
+}
+
+async function createCompletion(params) {
+  let lastError;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      return await getGroq().chat.completions.create(params);
+    } catch (error) {
+      lastError = error;
+      if (!isRetryable(error) || attempt === 2) throw error;
+      const retryAfter = Number(error?.headers?.['retry-after'] || 0);
+      const delay = retryAfter > 0 ? retryAfter * 1000 : 500 * (2 ** attempt);
+      await new Promise(resolve => setTimeout(resolve, Math.min(delay, 8000)));
+    }
+  }
+  throw lastError;
+}
+
+export async function checkGroq() {
+  if (!groq) return { configured: false, reachable: false, model: config.groqModel, message: 'GROQ_API_KEY is not configured' };
+  try {
+    const response = await groq.models.list();
+    const available = (response.data || []).some(model => model.id === config.groqModel);
+    return { configured: true, reachable: available, model: config.groqModel, message: available ? 'Groq model is available' : 'Selected Groq model is unavailable' };
+  } catch (error) {
+    return { configured: true, reachable: false, model: config.groqModel, message: error?.message || 'Groq health check failed' };
+  }
+}
 
 const SYSTEM_PROMPT = `You are an expert penetration tester and security researcher.
 You analyse scan results and make decisions about what vulnerabilities exist and what to test next.
@@ -40,8 +75,8 @@ Respond with this exact JSON structure:
   "reasoning": "2-3 sentence explanation of risk assessment"
 }`;
 
-  const response = await groq.chat.completions.create({
-    model: GROQ_MODEL,
+  const response = await createCompletion({
+    model: config.groqModel,
     messages: [
       { role: "system", content: SYSTEM_PROMPT },
       { role: "user",   content: prompt },
@@ -78,8 +113,8 @@ Respond with this exact JSON:
   "commands": ["suggested command 1", "suggested command 2"]
 }`;
 
-  const response = await groq.chat.completions.create({
-    model: GROQ_MODEL,
+  const response = await createCompletion({
+    model: config.groqModel,
     messages: [
       { role: "system", content: SYSTEM_PROMPT },
       { role: "user",   content: prompt },
@@ -127,8 +162,8 @@ Respond with this exact JSON:
   "conclusion": "2-3 sentence closing statement"
 }`;
 
-  const response = await groq.chat.completions.create({
-    model: GROQ_MODEL,
+  const response = await createCompletion({
+    model: config.groqModel,
     messages: [
       { role: "system", content: SYSTEM_PROMPT },
       { role: "user",   content: prompt },

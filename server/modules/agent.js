@@ -1,5 +1,6 @@
 import db from "../db.js";
 import { analyseHost, decideNextAction } from "./groq.js";
+import { config } from "../config.js";
 
 export async function runAgentLoop(scanId, emitLog) {
   const log = msg => {
@@ -15,7 +16,7 @@ export async function runAgentLoop(scanId, emitLog) {
   const hosts = db.prepare("SELECT * FROM hosts WHERE scan_id = ?").all(scanId);
   if (!hosts.length) return log("No hosts found to analyse");
 
-  log(`Analysing ${hosts.length} hosts with Groq (Llama 3.3-70B)...`);
+  log(`Analysing ${hosts.length} hosts with Groq (${config.groqModel})...`);
 
   const allFindings = [];
 
@@ -39,7 +40,7 @@ export async function runAgentLoop(scanId, emitLog) {
     // save each CVE as a finding
     for (const cve of analysis.cves || []) {
       db.prepare(`
-        INSERT INTO findings (scan_id, host_id, cve_id, title, service, port, score, severity, description, exploitable)
+        INSERT OR IGNORE INTO findings (scan_id, host_id, cve_id, title, service, port, score, severity, description, exploitable)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(
         scanId, host.id,
@@ -50,7 +51,13 @@ export async function runAgentLoop(scanId, emitLog) {
         cve.exploitable ? 1 : 0
       );
 
-      allFindings.push({ ...cve, host: host.hostname || host.ip, severity: analysis.risk?.toUpperCase() });
+      allFindings.push({
+        cve_id: cve.id,
+        title: cve.title,
+        port: cve.port,
+        host: host.hostname || host.ip,
+        severity: cve.score >= 9 ? "CRITICAL" : cve.score >= 7 ? "HIGH" : cve.score >= 4 ? "MEDIUM" : "LOW",
+      });
       log(`Groq: Found ${cve.id} on ${host.hostname || host.ip}:${cve.port} — CVSS ${cve.score}`);
     }
 

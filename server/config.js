@@ -16,6 +16,7 @@ export const config = {
   port: Number.parseInt(process.env.PORT || "3001", 10),
   appPassword: String(process.env.APP_PASSWORD || "").trim(),
   groqApiKey: String(process.env.GROQ_API_KEY || "").trim(),
+  groqModel: String(process.env.GROQ_MODEL || "openai/gpt-oss-20b").trim(),
   corsOrigins: parseList(process.env.CORS_ORIGINS),
   allowPrivateTargets: parseBoolean(process.env.ALLOW_PRIVATE_TARGETS),
   enableActiveExploitation: parseBoolean(process.env.ENABLE_ACTIVE_EXPLOITATION),
@@ -27,8 +28,12 @@ export const config = {
 export const DEFAULT_DEV_ORIGINS = [
   "http://localhost:5173",
   "http://127.0.0.1:5173",
+  "http://localhost:5174",
+  "http://127.0.0.1:5174",
   "http://localhost:4173",
   "http://127.0.0.1:4173",
+  "http://localhost:4174",
+  "http://127.0.0.1:4174",
 ];
 
 export function validateProductionConfig() {

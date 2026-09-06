@@ -1,4 +1,5 @@
 const activeTasks = new Map();
+const cancellationRequests = new Set();
 
 function getScanTasks(scanId) {
   return activeTasks.get(Number(scanId)) || new Set();
@@ -41,4 +42,16 @@ export function isScanTaskActive(scanId, type) {
 
 export function getActiveTaskCount() {
   return [...activeTasks.values()].reduce((total, tasks) => total + tasks.size, 0);
+}
+
+export function requestScanCancellation(scanId) {
+  cancellationRequests.add(Number(scanId));
+}
+
+export function isScanCancellationRequested(scanId) {
+  return cancellationRequests.has(Number(scanId));
+}
+
+export function clearScanCancellation(scanId) {
+  cancellationRequests.delete(Number(scanId));
 }

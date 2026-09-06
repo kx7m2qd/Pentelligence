@@ -1,0 +1,1 @@
+window.__PENTELLIGENCE_CONFIG__ = window.__PENTELLIGENCE_CONFIG__ || {};

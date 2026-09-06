@@ -27,8 +27,6 @@ export default defineConfig([
     },
     rules: {
       'no-unused-vars': ['error', { varsIgnorePattern: '^[A-Z_]' }],
-      // Scan changes intentionally reset view state when a new scan begins.
-      'react-hooks/set-state-in-effect': 'off',
     },
   },
 ])

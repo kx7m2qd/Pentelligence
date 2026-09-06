@@ -1,0 +1,41 @@
+services:
+  pentelligence:
+    build:
+      context: .
+      args:
+        GO_VERSION: ${GO_VERSION:-1.25-bookworm}
+        NODE_VERSION: ${NODE_VERSION:-22-bookworm-slim}
+        NUCLEI_VERSION: ${NUCLEI_VERSION:-latest}
+        SUBFINDER_VERSION: ${SUBFINDER_VERSION:-latest}
+    image: pentelligence:local
+    container_name: pentelligence
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      VITE_API_BASE_URL: /api
+      CORS_ORIGINS: http://localhost:3001,http://127.0.0.1:3001
+      NMAP_PATH: /usr/bin/nmap
+      NUCLEI_TEMPLATES_DIR: /home/node/nuclei-templates
+    ports:
+      - "${APP_PORT:-3001}:3001"
+    volumes:
+      - pentelligence-data:/app/data
+      - nuclei-templates:/home/node/nuclei-templates
+    cap_add:
+      - NET_RAW
+      - NET_ADMIN
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3001/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+volumes:
+  pentelligence-data:
+  nuclei-templates:

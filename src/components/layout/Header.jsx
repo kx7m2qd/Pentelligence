@@ -2,22 +2,78 @@ import React from 'react';
 import { Btn } from '../common/Btn';
 import { PAGE_LABELS } from '../../data/constants';
 
-export const Header = ({ active, target, setTarget, startScan, scanning }) => {
+function formatElapsed(seconds) {
+  if (!Number.isFinite(seconds) || seconds < 0) return '';
+  const minutes = Math.floor(seconds / 60);
+  const rest = seconds % 60;
+  return minutes > 0 ? `${minutes}m ${rest}s` : `${rest}s`;
+}
+
+export const Header = ({
+  active,
+  target,
+  scanning,
+  cancelling,
+  startFresh,
+  cancelScan,
+  hasSelection,
+  programName,
+  phase,
+  scanStatus,
+  elapsed,
+  onToggleNav,
+  mobileNavOpen,
+  onOpenPalette,
+}) => {
+  const statusLabel = scanning ? 'LIVE' : (scanStatus || 'idle').toUpperCase();
+  // LIVE always shows elapsed; a finished (done) scan only shows a time when
+  // one was actually recorded — avoid the misleading 'DONE · 0s' suffix.
+  const showElapsed = elapsed != null && (scanStatus !== 'done' || elapsed > 0);
+
   return (
-    <header style={{padding:"12px 22px",borderBottom:"1px solid var(--border)",display:"flex",alignItems:"center",gap:12,background:"var(--s1)",flexShrink:0}}>
-      <div style={{fontFamily:"var(--sans)",fontSize:11,letterSpacing:"0.12em",color:"var(--t3)",marginRight:"auto"}}>
-        {PAGE_LABELS[active]}
+    <header className="app-header">
+      <div className="header-leading">
+        <button type="button" className="mobile-nav-toggle" aria-label={mobileNavOpen ? 'Close navigation' : 'Open navigation'} aria-expanded={mobileNavOpen} onClick={onToggleNav}>☰</button>
+        <div className="header-page">{PAGE_LABELS[active]}</div>
       </div>
-      <div style={{display:"flex",alignItems:"center",gap:0,border:"1px solid var(--border2)",borderRadius:6,overflow:"hidden",background:"var(--s2)",width:300}}>
-        <span style={{padding:"0 10px",fontFamily:"var(--mono)",fontSize:11,color:"var(--t3)",flexShrink:0}}>target://</span>
-        <input value={target} onChange={e=>setTarget(e.target.value)} onKeyDown={e=>e.key==="Enter"&&startScan()}
-          placeholder="domain.com or 10.0.0.0/24"
-          style={{flex:1,background:"transparent",border:"none",outline:"none",color:"var(--t1)",fontFamily:"var(--mono)",fontSize:12,padding:"9px 0"}}/>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        {hasSelection ? (
+          <div className="header-investigation">
+            <span className="inv-chip" title="Target">{target || 'unknown target'}</span>
+            <span className="inv-chip muted-chip" title="Program">{programName || 'No program'}</span>
+            <span className="inv-chip muted-chip" title="Phase">
+              {(phase || 'queued').toUpperCase()}
+              {showElapsed ? ` · ${formatElapsed(elapsed)}` : ''}
+            </span>
+            <span className={`inv-status ${scanning ? 'live' : ''}`}>{statusLabel}</span>
+            <Btn onClick={scanning ? cancelScan : startFresh} disabled={cancelling}>{scanning ? (cancelling ? 'CANCELLING...' : 'CANCEL') : 'NEW'}</Btn>
+          </div>
+        ) : (
+          <div className="header-idle">Start an investigation from Live</div>
+        )}
+        <button
+          type="button"
+          onClick={onOpenPalette}
+          className="cmd-palette-btn"
+          style={{
+            background: 'var(--s2)',
+            border: '1px solid var(--border)',
+            borderRadius: 6,
+            padding: '5px 10px',
+            color: 'var(--t2)',
+            fontFamily: 'var(--mono)',
+            fontSize: 11,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+          }}
+          title="Open Command Palette (Cmd+K)"
+        >
+          <span>⌘K</span>
+          <span style={{ fontSize: 10, color: 'var(--t3)' }}>Commands</span>
+        </button>
       </div>
-      <Btn accent onClick={startScan} disabled={scanning} style={{display:"flex",alignItems:"center",gap:7,animation:scanning?"pulse 1.5s infinite":"none"}}>
-        {scanning&&<span style={{width:10,height:10,border:"1.5px solid var(--acc)",borderTopColor:"transparent",borderRadius:"50%",animation:"spin .7s linear infinite",display:"inline-block"}}/>}
-        {scanning?"SCANNING":"RUN SCAN"}
-      </Btn>
     </header>
   );
 };

@@ -38,9 +38,17 @@ function upsertPort(hostId, port, protocol, service, version, state) {
   `).run(service, version, state, hostId, port, protocol);
 }
 
-async function runNmap(targets, scanId) {
+const PORT_PROFILE_ARGS = {
+  quick: ['--top-ports', '100'],
+  standard: ['--top-ports', '1000'],
+  full: ['-p', '-'],
+};
+
+async function runNmap(targets, scanId, portProfile = 'standard') {
   const targetList = [...new Set((Array.isArray(targets) ? targets : [targets]).filter(Boolean))];
-  console.log(`[nmap] starting scan on ${targetList.length} target(s)`);
+  const selectedProfile = PORT_PROFILE_ARGS[portProfile] ? portProfile : 'standard';
+  const isFullScan = selectedProfile === 'full';
+  console.log(`[nmap] starting ${selectedProfile} scan on ${targetList.length} target(s)`);
 
   let xmlOutput = '';
 
@@ -50,14 +58,16 @@ async function runNmap(targets, scanId) {
       '-sT',
       '-sV',
       '--version-light',
-      '--top-ports', '20',
+      ...PORT_PROFILE_ARGS[selectedProfile],
       '--open',
-      '--host-timeout', '15s',
+      '--host-timeout', isFullScan ? '10m' : '45s',
       '-oX', '-',
       ...targetList,
     ], {
       env: { ...process.env, PATH: BREW_PATH },
-      timeout: Math.min(180_000, 30_000 + (targetList.length * 3_000)),
+      timeout: isFullScan
+        ? Math.min(900_000, 120_000 + (targetList.length * 30_000))
+        : Math.min(300_000, 45_000 + (targetList.length * 8_000)),
     });
 
     xmlOutput = stdout;

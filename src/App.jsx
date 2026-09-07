@@ -12,7 +12,7 @@ import Exploit from "./views/Exploit";
 import Report from "./views/Report";
 import CommandPalette from "./components/common/CommandPalette";
 import { apiGet, apiPost, ensureWorkspace, getAccessStatus } from "./lib/api";
-import { SCAN_INTENSITY } from "./data/constants";
+import { PORT_PROFILES, SCAN_INTENSITY } from "./data/constants";
 
 export default function App() {
   const [active, setActive] = useState("dashboard");
@@ -26,6 +26,7 @@ export default function App() {
   const [authorizationConfirmed, setAuthorizationConfirmed] = useState(false);
   const [selectedProgram, setSelectedProgram] = useState(null);
   const [intensity, setIntensity] = useState("balanced");
+  const [portProfile, setPortProfile] = useState("standard");
   const [scanRecord, setScanRecord] = useState(null);
   const [elapsed, setElapsed] = useState(0);
   const [focusHost, setFocusHost] = useState(null);
@@ -160,6 +161,7 @@ export default function App() {
         authorizationConfirmed: true,
         authorizationNote: "Confirmed in Pentelligence workspace",
         intensity,
+        portProfile,
       });
       selectScan({ id: data.scanId, target: data.target || target.trim(), status: "running", phase: "queued" });
       setActive("dashboard");
@@ -229,6 +231,9 @@ export default function App() {
               intensity={intensity}
               setIntensity={setIntensity}
               intensities={SCAN_INTENSITY}
+              portProfile={portProfile}
+              setPortProfile={setPortProfile}
+              portProfiles={PORT_PROFILES}
               onScanUpdate={scan => {
                 setScanRecord(scan);
                 if (scan?.status !== 'running') setCancelling(false);

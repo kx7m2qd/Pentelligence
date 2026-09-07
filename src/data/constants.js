@@ -4,6 +4,12 @@ export const SCAN_INTENSITY = {
   fast: { name: 'fast', rateLimit: 100, retries: 0, label: 'Fast', desc: '100 req/s · noisier, quicker' },
 };
 
+export const PORT_PROFILES = {
+  quick: { name: 'quick', label: 'Quick', desc: 'Top 100 ports · fast triage', warning: '' },
+  standard: { name: 'standard', label: 'Standard', desc: 'Top 1000 ports · recommended', warning: '' },
+  full: { name: 'full', label: 'Full surface', desc: 'All TCP ports · slow', warning: 'Use only for an explicitly authorized target; this profile is substantially noisier and slower.' },
+};
+
 export const NAV = [
   { id: 'dashboard', icon: '⬡', label: 'Live', group: 'investigation' },
   { id: 'recon', icon: '◎', label: 'Surface', group: 'investigation' },

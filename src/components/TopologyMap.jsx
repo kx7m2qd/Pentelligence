@@ -99,6 +99,7 @@ export default function TopologyMap({ hosts = [], subdomains = [], target, selec
     let raf;
     const step = () => {
       alpha = Math.max(alpha * 0.995, 0.03);
+      const now = performance.now() / 1000;
 
       // pairwise repulsion
       for (let i = 0; i < nodes.length; i++) {
@@ -137,6 +138,12 @@ export default function TopologyMap({ hosts = [], subdomains = [], target, selec
         const g = n.kind === "root" ? 0.12 : n.kind === "sub" ? 0.015 : n.kind === "host" ? 0.006 : 0.002;
         n.vx += (CENTER_X - n.x) * g * alpha * 10;
         n.vy += (CENTER_Y - n.y) * g * alpha * 10;
+        // A live scan should feel live without constantly rearranging the
+        // operator's mental model: hosts receive only a tiny telemetry drift.
+        if (scanning && n.kind === "host") {
+          n.vx += Math.sin(now * 1.7 + n.hostIndex) * 0.012;
+          n.vy += Math.cos(now * 1.3 + n.hostIndex) * 0.012;
+        }
         if (n.kind !== "root") { n.vx *= 0.85; n.vy *= 0.85; }
         if (dragRef.current?.id !== n.id) { n.x += n.vx; n.y += n.vy; }
         maxMotion = Math.max(maxMotion, Math.abs(n.vx) + Math.abs(n.vy));
@@ -147,7 +154,7 @@ export default function TopologyMap({ hosts = [], subdomains = [], target, selec
 
       // sleep when the layout has settled and nothing is being dragged —
       // avoids burning a re-render per frame on a static map
-      if (maxMotion < 0.05 && !dragRef.current) {
+      if (maxMotion < 0.05 && !dragRef.current && !scanning) {
         raf = null;
         return;
       }
@@ -157,7 +164,7 @@ export default function TopologyMap({ hosts = [], subdomains = [], target, selec
     wakeRef.current = wake;
     raf = requestAnimationFrame(step);
     return () => cancelAnimationFrame(raf);
-  }, [graph]);
+  }, [graph, scanning]);
 
   const nodeById = sim?.index || new Map();
 
@@ -233,6 +240,9 @@ export default function TopologyMap({ hosts = [], subdomains = [], target, selec
     }
     return Math.min(max, 250);
   })();
+  const liveHosts = sim?.nodes.filter(node => node.kind === "host").length || 0;
+  const openPorts = sim?.nodes.filter(node => node.kind === "port").length || 0;
+  const elevatedHosts = sim?.nodes.filter(node => node.kind === "host" && ["critical", "high"].includes(String(node.risk || "").toLowerCase())).length || 0;
 
   return (
     <div style={{ position: "relative" }}>
@@ -247,6 +257,16 @@ export default function TopologyMap({ hosts = [], subdomains = [], target, selec
         onPointerUp={endDrag}
         onPointerLeave={endDrag}
       >
+        <defs>
+          <pattern id="surface-grid" width="24" height="24" patternUnits="userSpaceOnUse">
+            <path d="M 24 0 L 0 0 0 24" fill="none" stroke="rgba(184,255,87,.055)" strokeWidth="0.55" />
+          </pattern>
+          <filter id="surface-glow" x="-80%" y="-80%" width="260%" height="260%">
+            <feGaussianBlur stdDeviation="3" result="blur" />
+            <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
+          </filter>
+        </defs>
+        <rect width={W} height={H} fill="url(#surface-grid)" />
         <g transform={`translate(${view.x},${view.y}) scale(${view.k})`}>
           {/* environment boundary, like a micro-seg segment */}
           <circle
@@ -256,6 +276,9 @@ export default function TopologyMap({ hosts = [], subdomains = [], target, selec
             strokeWidth="1.5"
             strokeDasharray="none"
           />
+          {scanning && <circle cx={CENTER_X} cy={CENTER_Y} r={40} fill="none" stroke="rgba(184,255,87,.42)" strokeWidth="1" strokeDasharray="3 6">
+            <animateTransform attributeName="transform" type="rotate" from={`0 ${CENTER_X} ${CENTER_Y}`} to={`360 ${CENTER_X} ${CENTER_Y}`} dur="7s" repeatCount="indefinite" />
+          </circle>}
           <text x={CENTER_X} y={CENTER_Y + boundaryRadius + 14} textAnchor="middle" fontFamily="var(--mono)" fontSize="9" fill="var(--t3)" letterSpacing="2">
             {(target || "TARGET").toUpperCase()} · ENVIRONMENT
           </text>
@@ -272,7 +295,9 @@ export default function TopologyMap({ hosts = [], subdomains = [], target, selec
                 stroke={selected ? "var(--acc)" : l.kind === "port" ? "rgba(120,140,120,.4)" : "rgba(140,160,130,.35)"}
                 strokeWidth={l.kind === "port" ? 1 : selected ? 1.6 : 1}
                 strokeDasharray={l.kind === "sub" ? "3 3" : "none"}
-              />
+              >
+                {scanning && l.kind !== "port" && <animate attributeName="stroke-dashoffset" from="0" to="-12" dur="1.8s" repeatCount="indefinite" />}
+              </line>
             );
           })}
 
@@ -299,6 +324,7 @@ export default function TopologyMap({ hosts = [], subdomains = [], target, selec
                   fill={fill}
                   stroke={selected ? "var(--acc)" : stroke}
                   strokeWidth={selected ? 2.4 : n.kind === "root" ? 1.6 : 1.2}
+                  filter={isHost && ["critical", "high"].includes(String(n.risk || "").toLowerCase()) ? "url(#surface-glow)" : undefined}
                 />
                 {n.kind === "root" && (
                   <>
@@ -328,6 +354,11 @@ export default function TopologyMap({ hosts = [], subdomains = [], target, selec
           })}
         </g>
       </svg>
+      <div style={{ position: "absolute", top: 12, left: 12, display: "flex", gap: 6, flexWrap: "wrap", pointerEvents: "none" }}>
+        {[["HOSTS", liveHosts, "var(--acc)"], ["PORTS", openPorts, "var(--blue)"], ["HIGH RISK", elevatedHosts, elevatedHosts ? "var(--red)" : "var(--t3)"]].map(([label, value, color]) => (
+          <span key={label} style={{ fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".08em", color, padding: "5px 7px", border: "1px solid var(--border)", borderRadius: 4, background: "rgba(10,16,13,.78)" }}>{label} <strong>{value}</strong></span>
+        ))}
+      </div>
       <div style={{
         position: "absolute", bottom: 8, left: 12, right: 12,
         display: "flex", gap: 14, fontFamily: "var(--mono)", fontSize: 9, color: "var(--t3)",

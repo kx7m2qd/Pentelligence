@@ -41,6 +41,9 @@ export default function Dashboard({
   intensity,
   setIntensity,
   intensities,
+  portProfile,
+  setPortProfile,
+  portProfiles,
   onScanUpdate,
   onOpenFindings,
   onOpenSurface,
@@ -120,6 +123,8 @@ export default function Dashboard({
   if (!scanId) {
     const readyCount = tools.filter(tool => tool.installed).length;
     const intensityList = Object.values(intensities || {});
+    const portProfileList = Object.values(portProfiles || {});
+    const selectedPortProfile = portProfiles?.[portProfile];
     return (
       <div className="page">
         <div className="empty-hero">
@@ -166,6 +171,18 @@ export default function Dashboard({
                   </button>
                 ))}
               </div>
+            </div>
+            <div className="setup-field">
+              <span>Port coverage</span>
+              <div className="intensity-row">
+                {portProfileList.map(item => (
+                  <button key={item.name} type="button" className={`intensity-chip ${portProfile === item.name ? 'active' : ''}`} onClick={() => setPortProfile(item.name)}>
+                    <strong>{item.label}</strong>
+                    <small>{item.desc}</small>
+                  </button>
+                ))}
+              </div>
+              {selectedPortProfile?.warning && <p className="empty-copy" style={{ margin: '8px 0 0', color: 'var(--orange)' }}>{selectedPortProfile.warning}</p>}
             </div>
             <label className="authorized-note" style={{ cursor: 'pointer' }}>
               <input type="checkbox" checked={authorizationConfirmed} onChange={event => setAuthorizationConfirmed(event.target.checked)} style={{ accentColor: 'var(--acc)' }} />

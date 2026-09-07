@@ -27,6 +27,7 @@ const INTENSITY_PROFILES = {
   balanced: { rateLimit: 50, retries: 1 },
   fast: { rateLimit: 100, retries: 0 },
 };
+const PORT_PROFILES = new Set(['quick', 'standard', 'full']);
 
 function setScanState(scanId, updates) {
   const fields = [];
@@ -114,7 +115,10 @@ async function runReconPipeline(scanId, target, scopeRules = null, excludeRules 
       phase: 'nmap',
       message: `Scanning ports and services across ${scanTargets.length} discovered targets`,
     });
-    const hosts = await runNmap(scanTargets, scanId);
+    const savedProfile = db.prepare('SELECT profile_json FROM scans WHERE id = ?').get(scanId);
+    let profile = {};
+    try { profile = JSON.parse(savedProfile?.profile_json || '{}'); } catch { profile = {}; }
+    const hosts = await runNmap(scanTargets, scanId, profile.portProfile);
     checkCancellation();
 
     setScanState(scanId, { phase: 'web', message: `Probing HTTP services across ${scanTargets.length} targets` });
@@ -141,9 +145,6 @@ async function runReconPipeline(scanId, target, scopeRules = null, excludeRules 
     }
 
     setScanState(scanId, { phase: 'nuclei', message: 'Running nuclei confirmation checks' });
-    const scanConfig = db.prepare('SELECT profile_json FROM scans WHERE id = ?').get(scanId);
-    let profile = {};
-    try { profile = JSON.parse(scanConfig?.profile_json || '{}'); } catch { profile = {}; }
     await runNucleiOnScan(scanId, msg => {
       db.prepare("INSERT INTO agent_logs (scan_id, type, content) VALUES (?, ?, ?)")
         .run(scanId, "nuclei-log", msg);
@@ -238,6 +239,7 @@ router.post('/start', async (req, res) => {
   } else {
     profile = { ...INTENSITY_PROFILES.balanced };
   }
+  profile.portProfile = PORT_PROFILES.has(req.body?.portProfile) ? req.body.portProfile : 'standard';
 
   const scan = db.prepare(`
     INSERT INTO scans (target, status, phase, message, error_message, workspace_id, program_id, profile_json)

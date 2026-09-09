@@ -164,3 +164,9 @@ curl http://localhost:3001/api/health/tools
 - Do not share the deployment password. For a true multi-user deployment, connect the API to an identity provider before granting external access.
 
 The built-in HTTP probe records status, title, server header, content type, response size, redirect location, and response time without requiring a separate `httpx` installation. Nuclei rate limits and retries come from the scan intensity chosen at start: safe is 25 requests per second, balanced 50, fast 100 (no retries). A linked program profile is used as fallback when no intensity is sent. Nuclei templates are read from `NUCLEI_TEMPLATES_DIR` (default `~/nuclei-templates`); when that directory is missing, CVE-specific scans fall back to severity-based default templates.
+
+## License
+
+This project is licensed under the MIT license, see [LICENSE](LICENSE) for the full text.
+
+Pentelligence is a security testing tool. Use it only against systems you own or have explicit permission to test. Unauthorized scanning is illegal, and the authors accept no liability for misuse.

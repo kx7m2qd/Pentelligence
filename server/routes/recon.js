@@ -7,6 +7,7 @@ import { runNmap } from '../modules/nmap.js';
 import { runSubfinder } from '../modules/subfinder.js';
 import { runAgentLoop } from '../modules/agent.js';
 import { runNucleiOnScan } from '../modules/nuclei.js';
+import { sanitizeTemplateTags } from '../nuclei-args.js';
 import { generateReport } from '../modules/groq.js';
 import { beginScanTask, clearScanCancellation, endScanTask, getActiveTaskCount, isAnyScanTaskActive, isScanCancellationRequested, requestScanCancellation } from '../scanState.js';
 import { assertPublicResolution, filterPublicTargets, normalizeTargetInput } from '../targets.js';
@@ -240,6 +241,7 @@ router.post('/start', async (req, res) => {
     profile = { ...INTENSITY_PROFILES.balanced };
   }
   profile.portProfile = PORT_PROFILES.has(req.body?.portProfile) ? req.body.portProfile : 'standard';
+  profile.templateTags = sanitizeTemplateTags(req.body?.templateTags);
 
   const scan = db.prepare(`
     INSERT INTO scans (target, status, phase, message, error_message, workspace_id, program_id, profile_json)

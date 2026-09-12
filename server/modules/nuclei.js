@@ -3,6 +3,7 @@ import path from 'path';
 import { execa } from 'execa';
 import db from '../db.js';
 import { beginScanTask, endScanTask } from '../scanState.js';
+import { buildNucleiArgs } from '../nuclei-args.js';
 
 const TEMPLATES_DIR = process.env.NUCLEI_TEMPLATES_DIR || path.join(
   process.env.HOME || process.env.USERPROFILE || '',
@@ -39,39 +40,11 @@ function insertFinding(finding) {
 
 export async function runNuclei(host, scanId, options = {}) {
   const target = host.hostname || host.ip;
-  const templateArgs = [];
 
-  if (options.cves?.length) {
-    const cvesDir = path.join(TEMPLATES_DIR, 'cves');
-
-    if (TEMPLATES_AVAILABLE && fs.existsSync(cvesDir)) {
-      templateArgs.push('-t', cvesDir);
-    }
-
-    for (const cve of options.cves) {
-      templateArgs.push('-id', cve.toLowerCase());
-    }
-  } else {
-    templateArgs.push('-severity', 'critical,high');
-  }
-
-  // Honours the profile's retries when it is an integer 0-9 (fast = 0);
-  // otherwise keep the previous hardcoded default of 1.
-  const retries = Number.isInteger(options.retries) && options.retries >= 0 && options.retries <= 9
-    ? String(options.retries)
-    : '1';
-
-  const args = [
-    '-target', `https://${target}`,
-    '-target', `http://${target}`,
-    ...templateArgs,
-    '-json',
-    '-silent',
-    '-no-color',
-    '-timeout', '10',
-    '-retries', retries,
-    '-rate-limit', String(Math.min(200, Math.max(1, Number(options.rateLimit) || 50))),
-  ];
+  const args = buildNucleiArgs(target, options, {
+    templatesDir: TEMPLATES_DIR,
+    templatesAvailable: TEMPLATES_AVAILABLE,
+  });
 
   let stdout = '';
 

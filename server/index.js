@@ -10,9 +10,11 @@ import exploitRouter from './routes/exploit.js';
 import findingsRouter from './routes/findings.js';
 import authRouter from './routes/auth.js';
 import programsRouter from './routes/programs.js';
+import templatesRouter from './routes/templates.js';
 import { config, DEFAULT_DEV_ORIGINS, validateProductionConfig } from './config.js';
 import { getToolReadiness } from './tools.js';
 import { checkGroq } from './modules/groq.js';
+import { ensureTemplates } from './modules/templates.js';
 import { createWorkspace, requireAccessSession, requireWorkspace } from './workspaces.js';
 
 validateProductionConfig();
@@ -93,6 +95,7 @@ app.use('/api/nuclei', nucleiRouter);
 app.use('/api/exploit', exploitRouter);
 app.use('/api/findings', findingsRouter);
 app.use('/api/programs', programsRouter);
+app.use('/api/templates', templatesRouter);
 
 // health check
 app.get('/api/health', (req, res) =>
@@ -141,4 +144,5 @@ app.use((err, req, res, next) => {
 
 app.listen(config.port, () => {
   console.log(`[server] running on http://localhost:${config.port}`);
+  ensureTemplates();
 });

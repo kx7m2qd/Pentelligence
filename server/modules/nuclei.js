@@ -4,17 +4,7 @@ import { execa } from 'execa';
 import db from '../db.js';
 import { beginScanTask, endScanTask } from '../scanState.js';
 import { buildNucleiArgs } from '../nuclei-args.js';
-
-const TEMPLATES_DIR = process.env.NUCLEI_TEMPLATES_DIR || path.join(
-  process.env.HOME || process.env.USERPROFILE || '',
-  'nuclei-templates',
-);
-
-// Check at startup
-const TEMPLATES_AVAILABLE = fs.existsSync(TEMPLATES_DIR);
-if (!TEMPLATES_AVAILABLE) {
-  console.warn(`[nuclei] templates directory not found at ${TEMPLATES_DIR} — CVE-specific scans will use default templates`);
-}
+import { templatesDir as TEMPLATES_DIR, templatesExist } from './templates.js';
 
 function insertFinding(finding) {
   db.prepare(`
@@ -43,7 +33,7 @@ export async function runNuclei(host, scanId, options = {}) {
 
   const args = buildNucleiArgs(target, options, {
     templatesDir: TEMPLATES_DIR,
-    templatesAvailable: TEMPLATES_AVAILABLE,
+    templatesAvailable: templatesExist(),
   });
 
   let stdout = '';

@@ -1,5 +1,3 @@
-import fs from 'fs';
-import path from 'path';
 import { execa } from 'execa';
 import db from '../db.js';
 import { beginScanTask, endScanTask } from '../scanState.js';

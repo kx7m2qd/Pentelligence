@@ -12,7 +12,7 @@ import Exploit from "./views/Exploit";
 import Report from "./views/Report";
 import CommandPalette from "./components/common/CommandPalette";
 import { apiGet, apiPost, ensureWorkspace, getAccessStatus } from "./lib/api";
-import { PORT_PROFILES, SCAN_INTENSITY } from "./data/constants";
+import { PORT_PROFILES, SCAN_INTENSITY, TEMPLATE_FOCUS } from "./data/constants";
 
 export default function App() {
   const [active, setActive] = useState("dashboard");
@@ -27,6 +27,7 @@ export default function App() {
   const [selectedProgram, setSelectedProgram] = useState(null);
   const [intensity, setIntensity] = useState("balanced");
   const [portProfile, setPortProfile] = useState("standard");
+  const [templateFocus, setTemplateFocus] = useState("all");
   const [scanRecord, setScanRecord] = useState(null);
   const [elapsed, setElapsed] = useState(0);
   const [focusHost, setFocusHost] = useState(null);
@@ -162,6 +163,7 @@ export default function App() {
         authorizationNote: "Confirmed in Pentelligence workspace",
         intensity,
         portProfile,
+        templateTags: TEMPLATE_FOCUS[templateFocus]?.tags || [],
       });
       selectScan({ id: data.scanId, target: data.target || target.trim(), status: "running", phase: "queued" });
       setActive("dashboard");
@@ -234,6 +236,9 @@ export default function App() {
               portProfile={portProfile}
               setPortProfile={setPortProfile}
               portProfiles={PORT_PROFILES}
+              templateFocus={templateFocus}
+              setTemplateFocus={setTemplateFocus}
+              templateFocuses={TEMPLATE_FOCUS}
               onScanUpdate={scan => {
                 setScanRecord(scan);
                 if (scan?.status !== 'running') setCancelling(false);

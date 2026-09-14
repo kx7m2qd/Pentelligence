@@ -10,6 +10,14 @@ export const PORT_PROFILES = {
   full: { name: 'full', label: 'Full surface', desc: 'All TCP ports · slow', warning: 'Use only for an explicitly authorized target; this profile is substantially noisier and slower.' },
 };
 
+export const TEMPLATE_FOCUS = {
+  all: { name: 'all', label: 'All critical/high', desc: 'Default severity sweep', tags: [] },
+  takeover: { name: 'takeover', label: 'Takeover', desc: 'Subdomain takeover checks', tags: ['takeover'] },
+  exposure: { name: 'exposure', label: 'Exposures', desc: 'Tokens, panels, secrets', tags: ['exposure'] },
+  misconfig: { name: 'misconfig', label: 'Misconfig', desc: 'Server misconfigurations', tags: ['misconfig'] },
+  cve: { name: 'cve', label: 'CVE', desc: 'Known CVE templates', tags: ['cve'] },
+};
+
 export const NAV = [
   { id: 'dashboard', icon: '⬡', label: 'Live', group: 'investigation' },
   { id: 'recon', icon: '◎', label: 'Surface', group: 'investigation' },

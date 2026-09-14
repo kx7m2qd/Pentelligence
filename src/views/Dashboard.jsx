@@ -44,6 +44,9 @@ export default function Dashboard({
   portProfile,
   setPortProfile,
   portProfiles,
+  templateFocus,
+  setTemplateFocus,
+  templateFocuses,
   onScanUpdate,
   onOpenFindings,
   onOpenSurface,
@@ -55,15 +58,21 @@ export default function Dashboard({
   const [decision, setDecision] = useState(null);
   const [toolHealth, setToolHealth] = useState(null);
   const [groqHealth, setGroqHealth] = useState(null);
+  const [templatesInfo, setTemplatesInfo] = useState(null);
   const [noProgramAccepted, setNoProgramAccepted] = useState(false);
   const previousFindingCount = useRef(0);
 
   useEffect(() => {
     const loadToolHealth = async () => {
       try {
-        const [tools, groq] = await Promise.all([apiGet('/health/tools'), apiGet('/health/groq')]);
+        const [tools, groq, templates] = await Promise.all([
+          apiGet('/health/tools'),
+          apiGet('/health/groq'),
+          apiGet('/templates/status').catch(() => null),
+        ]);
         setToolHealth(tools);
         setGroqHealth(groq);
+        setTemplatesInfo(templates);
       } catch (err) {
         console.error('tool readiness failed:', err);
       }
@@ -125,6 +134,8 @@ export default function Dashboard({
     const intensityList = Object.values(intensities || {});
     const portProfileList = Object.values(portProfiles || {});
     const selectedPortProfile = portProfiles?.[portProfile];
+    const templateFocusList = Object.values(templateFocuses || {});
+    const selectedTemplateFocus = templateFocuses?.[templateFocus];
     return (
       <div className="page">
         <div className="empty-hero">
@@ -184,6 +195,22 @@ export default function Dashboard({
               </div>
               {selectedPortProfile?.warning && <p className="empty-copy" style={{ margin: '8px 0 0', color: 'var(--orange)' }}>{selectedPortProfile.warning}</p>}
             </div>
+            <div className="setup-field">
+              <span>Template focus</span>
+              <div className="intensity-row">
+                {templateFocusList.map(item => (
+                  <button key={item.name} type="button" className={`intensity-chip ${templateFocus === item.name ? 'active' : ''}`} onClick={() => setTemplateFocus(item.name)}>
+                    <strong>{item.label}</strong>
+                    <small>{item.desc}</small>
+                  </button>
+                ))}
+              </div>
+              {selectedTemplateFocus && selectedTemplateFocus.tags.length > 0 && (
+                <p className="empty-copy" style={{ margin: '8px 0 0' }}>
+                  Narrowed to templates tagged {selectedTemplateFocus.tags.join(', ')} — other severities are skipped for this scan.
+                </p>
+              )}
+            </div>
             <label className="authorized-note" style={{ cursor: 'pointer' }}>
               <input type="checkbox" checked={authorizationConfirmed} onChange={event => setAuthorizationConfirmed(event.target.checked)} style={{ accentColor: 'var(--acc)' }} />
               {selectedProgram
@@ -220,6 +247,15 @@ export default function Dashboard({
                 </div>
               )) : (
                 <div className="tool-row"><span className="tool-dot" style={{ background: 'var(--t3)' }} /><span className="tool-name">Checking services...</span></div>
+              )}
+              {templatesInfo && (
+                <div className="tool-row">
+                  <span className="tool-dot" style={{ background: templatesInfo.exists ? 'var(--acc)' : templatesInfo.updating ? 'var(--orange)' : 'var(--yellow)' }} />
+                  <span className="tool-name">Template library</span>
+                  <span className="tool-meta">
+                    {templatesInfo.updating ? 'DOWNLOADING…' : templatesInfo.exists ? `READY${templatesInfo.lastUpdate ? ` · ${templatesInfo.lastUpdate.slice(0, 10)}` : ''}` : 'MISSING — updates on next server start'}
+                  </span>
+                </div>
               )}
             </div>
             <div className="steps">

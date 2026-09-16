@@ -5,6 +5,7 @@ import { EmptyState } from "../components/common/EmptyState";
 import TopologyMap from "../components/TopologyMap";
 import { apiGet } from "../lib/api";
 import { rc } from "../utils/colors";
+import { summarizeForHosts } from "../utils/findings.js";
 
 const SCAN_PHASES = [
   { key: "queued", label: "Queued", icon: "·" },
@@ -114,6 +115,7 @@ function ScanProgress({ scan, hosts, subdomains, elapsed }) {
 
 export default function Recon({ scanId, focusHost, onGoLive }) {
   const [data, setData] = useState(null);
+  const [findings, setFindings] = useState([]);
   const [error, setError] = useState(null);
   const [elapsed, setElapsed] = useState(0);
   const timerRef = useRef(null);
@@ -123,8 +125,12 @@ export default function Recon({ scanId, focusHost, onGoLive }) {
 
     const poll = async () => {
       try {
-        const json = await apiGet(`/recon/status/${scanId}`);
+        const [json, findingsJson] = await Promise.all([
+          apiGet(`/recon/status/${scanId}`),
+          apiGet(`/nuclei/findings/${scanId}`).catch(() => null),
+        ]);
         setData(json);
+        setFindings(findingsJson?.findings || []);
 
         if (json.scan?.status === "done" || json.scan?.status === "error") {
           clearInterval(timerRef.current);
@@ -155,7 +161,9 @@ export default function Recon({ scanId, focusHost, onGoLive }) {
   const subdomains = useMemo(() => data?.subdomains || [], [data]);
   const stats = data?.stats || { hostsFound: 0, subdomainsFound: 0, openPorts: 0 };
   const [selectedHostIndex, setSelectedHostIndex] = useState(null);
+  const [centerOnIndex, setCenterOnIndex] = useState(null);
   const selectedHost = selectedHostIndex != null ? hosts[selectedHostIndex] : null;
+  const hostFindings = useMemo(() => summarizeForHosts(findings, hosts), [findings, hosts]);
   const webAssets = data?.webAssets || [];
   const [activeTab, setActiveTab] = useState("all");
   const [lightbox, setLightbox] = useState(null);
@@ -184,7 +192,10 @@ export default function Recon({ scanId, focusHost, onGoLive }) {
     });
     if (index >= 0) {
       // defer to after the paint so the effect body stays render-safe
-      const raf = requestAnimationFrame(() => setSelectedHostIndex(index));
+      const raf = requestAnimationFrame(() => {
+        setSelectedHostIndex(index);
+        setCenterOnIndex(index);
+      });
       return () => cancelAnimationFrame(raf);
     }
     return undefined;
@@ -375,6 +386,8 @@ export default function Recon({ scanId, focusHost, onGoLive }) {
             target={scan?.target}
             selectedHostIndex={selectedHostIndex}
             onSelectHost={setSelectedHostIndex}
+            hostFindings={hostFindings}
+            centerOnIndex={centerOnIndex}
             scanning={isScanning}
           />
         </Card>

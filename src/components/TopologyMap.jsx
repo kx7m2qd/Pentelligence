@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { rc } from "../utils/colors";
+import { sc } from "../utils/colors";
 
 // Shared map geometry: the simulation seeds, gravity, boundary circle and the
 // "TARGET · ENVIRONMENT" label all derive from these so they can't drift.
@@ -70,7 +71,16 @@ function buildGraph(hosts, subdomains, target) {
   return { nodes, links };
 }
 
-export default function TopologyMap({ hosts = [], subdomains = [], target, selectedHostIndex, onSelectHost, scanning }) {
+export default function TopologyMap({
+  hosts = [],
+  subdomains = [],
+  target,
+  selectedHostIndex,
+  onSelectHost,
+  scanning,
+  hostFindings = [],
+  centerOnIndex = null,
+}) {
   const graph = useMemo(() => buildGraph(hosts, subdomains, target), [hosts, subdomains, target]);
   const svgRef = useRef(null);
   const [view, setView] = useState({ x: 0, y: 0, k: 1 });
@@ -151,6 +161,7 @@ export default function TopologyMap({ hosts = [], subdomains = [], target, selec
       }
 
       setSim({ nodes, index, links });
+      simRef.current = { nodes, index, links };
 
       // sleep when the layout has settled and nothing is being dragged —
       // avoids burning a re-render per frame on a static map
@@ -167,6 +178,25 @@ export default function TopologyMap({ hosts = [], subdomains = [], target, selec
   }, [graph, scanning]);
 
   const nodeById = sim?.index || new Map();
+  const simRef = useRef(null);
+
+  // Centre the map on a host when triage jumps here from a finding. Deferred
+  // with a timeout so the state update does not run inside the effect body,
+  // and reading the sim through a ref to keep the dependency list minimal.
+  useEffect(() => {
+    if (centerOnIndex == null) return undefined;
+    const id = setTimeout(() => {
+      const current = simRef.current;
+      if (!current) return;
+      const node = current.nodes.find(n => n.kind === "host" && n.hostIndex === centerOnIndex);
+      if (!node) return;
+      setView(v => {
+        const k = Math.max(v.k, 1.3);
+        return { x: CENTER_X - node.x * k, y: CENTER_Y - node.y * k, k };
+      });
+    }, 0);
+    return () => clearTimeout(id);
+  }, [centerOnIndex]);
 
   const toSvg = (clientX, clientY) => {
     const rect = svgRef.current?.getBoundingClientRect();
@@ -319,6 +349,16 @@ export default function TopologyMap({ hosts = [], subdomains = [], target, selec
                 style={{ cursor: isHost ? "pointer" : "grab" }}
                 onPointerDown={e => startNodeDrag(e, n)}
               >
+                {isHost && hostFindings[n.hostIndex] && (
+                  <circle
+                    r={n.r + 5}
+                    fill="none"
+                    stroke={sc(hostFindings[n.hostIndex].maxSeverity)}
+                    strokeWidth="1.6"
+                    strokeDasharray="4 3"
+                    opacity="0.85"
+                  />
+                )}
                 <circle
                   r={n.r}
                   fill={fill}
@@ -344,6 +384,11 @@ export default function TopologyMap({ hosts = [], subdomains = [], target, selec
                       {n.label.length > 24 ? n.label.slice(0, 22) + "…" : n.label}
                     </text>
                     <text textAnchor="middle" y={n.r + 10} fontFamily="var(--mono)" fontSize="7" fill="var(--t3)">{n.ip}</text>
+                    {hostFindings[n.hostIndex] && (
+                      <text textAnchor="middle" y={n.r + 20} fontFamily="var(--mono)" fontSize="7.5" fontWeight="700" fill={sc(hostFindings[n.hostIndex].maxSeverity)}>
+                        {hostFindings[n.hostIndex].count} finding{hostFindings[n.hostIndex].count === 1 ? "" : "s"}
+                      </text>
+                    )}
                   </>
                 )}
                 {n.kind === "port" && (

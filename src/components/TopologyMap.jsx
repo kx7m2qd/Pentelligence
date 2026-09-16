@@ -161,6 +161,7 @@ export default function TopologyMap({
       }
 
       setSim({ nodes, index, links });
+      simRef.current = { nodes, index, links };
 
       // sleep when the layout has settled and nothing is being dragged —
       // avoids burning a re-render per frame on a static map
@@ -177,13 +178,24 @@ export default function TopologyMap({
   }, [graph, scanning]);
 
   const nodeById = sim?.index || new Map();
+  const simRef = useRef(null);
 
+  // Centre the map on a host when triage jumps here from a finding. Deferred
+  // with a timeout so the state update does not run inside the effect body,
+  // and reading the sim through a ref to keep the dependency list minimal.
   useEffect(() => {
-    if (centerOnIndex == null || !sim) return;
-    const node = sim.nodes.find(n => n.kind === "host" && n.hostIndex === centerOnIndex);
-    if (!node) return;
-    const k = Math.max(view.k, 1.3);
-    setView({ x: CENTER_X - node.x * k, y: CENTER_Y - node.y * k, k });
+    if (centerOnIndex == null) return undefined;
+    const id = setTimeout(() => {
+      const current = simRef.current;
+      if (!current) return;
+      const node = current.nodes.find(n => n.kind === "host" && n.hostIndex === centerOnIndex);
+      if (!node) return;
+      setView(v => {
+        const k = Math.max(v.k, 1.3);
+        return { x: CENTER_X - node.x * k, y: CENTER_Y - node.y * k, k };
+      });
+    }, 0);
+    return () => clearTimeout(id);
   }, [centerOnIndex]);
 
   const toSvg = (clientX, clientY) => {

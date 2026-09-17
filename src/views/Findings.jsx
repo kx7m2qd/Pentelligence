@@ -6,6 +6,7 @@ import { Btn } from '../components/common/Btn';
 import { EmptyState } from '../components/common/EmptyState';
 import { apiGet, apiPatch } from '../lib/api';
 import { sc, sb } from '../utils/colors';
+import { buildFindingMarkdown } from '../utils/findings.js';
 
 function sourceMeta(source) {
   if (source === 'nuclei') return { label: 'NUCLEI CONFIRMED', color: 'var(--acc)', bg: 'rgba(184,255,87,.1)' };
@@ -19,6 +20,8 @@ export default function Findings({ scanId, onGoLive, onOpenHost }) {
   const [query, setQuery] = useState('');
   const [sortBy, setSortBy] = useState('severity');
   const [selected, setSelected] = useState(null);
+  const [screenshots, setScreenshots] = useState({});
+  const [copied, setCopied] = useState('');
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -26,10 +29,11 @@ export default function Findings({ scanId, onGoLive, onOpenHost }) {
 
     const poll = async () => {
       try {
-        const [findingsData, nucleiData, reviewsData] = await Promise.all([
+        const [findingsData, nucleiData, reviewsData, statusData] = await Promise.all([
           apiGet(`/agent/findings/${scanId}`),
           apiGet(`/nuclei/findings/${scanId}`),
           apiGet(`/findings/reviews/${scanId}`),
+          apiGet(`/recon/status/${scanId}`).catch(() => null),
         ]);
         const agentFindings = (findingsData.findings || []).map(finding => ({
           ...finding,
@@ -45,6 +49,16 @@ export default function Findings({ scanId, onGoLive, onOpenHost }) {
         }));
         setFindings([...nucleiFindings, ...agentFindings]);
         setReviews(Object.fromEntries((reviewsData.reviews || []).map(review => [`${review.source}:${review.finding_id}`, review])));
+        const shots = {};
+        for (const item of statusData?.evidence || []) {
+          if (item.type !== 'screenshot' || !item.path) continue;
+          let meta = {};
+          try { meta = JSON.parse(item.metadata_json || '{}'); } catch { meta = {}; }
+          const filename = item.path.split('/').pop();
+          const hostname = String(meta.hostname || item.target || '').toLowerCase();
+          if (hostname && !shots[hostname]) shots[hostname] = `/api/recon/evidence/${scanId}/${encodeURIComponent(filename)}`;
+        }
+        setScreenshots(shots);
         setError('');
       } catch (err) {
         setError(err.message);
@@ -114,6 +128,17 @@ export default function Findings({ scanId, onGoLive, onOpenHost }) {
       setReviews(current => ({ ...current, [`${selected.source}:${selected.id}`]: response.review }));
     } catch (err) {
       setError(err.message);
+    }
+  };
+
+  const copyText = async (text, key) => {
+    if (!text) return;
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(key);
+      setTimeout(() => setCopied(''), 1500);
+    } catch {
+      setCopied('');
     }
   };
 
@@ -217,6 +242,26 @@ export default function Findings({ scanId, onGoLive, onOpenHost }) {
                 <div>
                   <div className="eyebrow" style={{ marginBottom: 4 }}>CURL VERIFICATION</div>
                   <code style={{ display: 'block', padding: '8px 12px', borderRadius: 6, background: 'var(--s2)', border: '1px solid var(--border)', overflowWrap: 'anywhere' }}>{selected.curl_cmd}</code>
+                </div>
+              )}
+
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                {selected.curl_cmd && (
+                  <Btn sm onClick={() => void copyText(selected.curl_cmd, 'curl')}>{copied === 'curl' ? 'COPIED ✓' : 'COPY CURL'}</Btn>
+                )}
+                <Btn sm onClick={() => void copyText(buildFindingMarkdown(selected), 'md')}>{copied === 'md' ? 'COPIED ✓' : 'COPY SUBMISSION DRAFT'}</Btn>
+              </div>
+
+              {screenshots[String(selected.host || '').toLowerCase()] && (
+                <div>
+                  <div className="eyebrow" style={{ marginBottom: 4 }}>SCREENSHOT EVIDENCE</div>
+                  <a href={screenshots[String(selected.host || '').toLowerCase()]} target="_blank" rel="noreferrer">
+                    <img
+                      src={screenshots[String(selected.host || '').toLowerCase()]}
+                      alt={`Screenshot of ${selected.host}`}
+                      style={{ width: '100%', maxHeight: 220, objectFit: 'cover', borderRadius: 8, border: '1px solid var(--border)' }}
+                    />
+                  </a>
                 </div>
               )}
 

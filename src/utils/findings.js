@@ -31,3 +31,30 @@ export function summarizeForHosts(findings, hosts) {
     return byHost.get(key) || null;
   });
 }
+
+// Markdown draft for one finding, ready to paste into a bounty submission.
+export function buildFindingMarkdown(finding) {
+  if (!finding) return '';
+  const lines = [];
+  lines.push(`## ${finding.title || finding.name || finding.cve_id || 'Finding'}`);
+  lines.push('');
+  lines.push(`- Severity: ${String(finding.severity || 'unknown').toUpperCase()}`);
+  lines.push(`- Asset: ${finding.host || 'unknown'}`);
+  if (finding.matched_at) lines.push(`- Matched at: ${finding.matched_at}`);
+  if (finding.cve_id || finding.template_id) lines.push(`- Reference: ${finding.cve_id || finding.template_id}`);
+  if (finding.curl_cmd) {
+    lines.push('');
+    lines.push('### Reproduction');
+    lines.push('');
+    lines.push('```bash');
+    lines.push(finding.curl_cmd);
+    lines.push('```');
+  }
+  if (finding.description) {
+    lines.push('');
+    lines.push('### Details');
+    lines.push('');
+    lines.push(finding.description);
+  }
+  return lines.join('\n');
+}

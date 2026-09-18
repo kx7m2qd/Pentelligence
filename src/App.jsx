@@ -7,6 +7,7 @@ import History from "./views/History";
 import Programs from './views/Programs';
 import Recon from "./views/Recon";
 import Findings from "./views/Findings";
+import Changes from "./views/Changes";
 import Scan from "./views/Scan";
 import Exploit from "./views/Exploit";
 import Report from "./views/Report";
@@ -269,6 +270,13 @@ export default function App() {
               scanId={currentScanId}
               onGoLive={() => setActive("dashboard")}
               onOpenHost={openSurfaceForHost}
+            />
+          )}
+          {active === "changes" && (
+            <Changes
+              key={`changes-${currentScanId || "none"}`}
+              scanId={currentScanId}
+              onGoLive={() => setActive("dashboard")}
             />
           )}
           {active === "scan" && (

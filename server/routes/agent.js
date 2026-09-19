@@ -12,7 +12,7 @@ router.post("/run/:scanId", async (req, res) => {
   const { scanId } = req.params;
   const scan = ownedScan(req.workspaceId, scanId);
   if (!scan) return res.status(404).json({ error: "scan not found" });
-  if (!config.groqApiKey) return res.status(400).json({ error: "GROQ_API_KEY is not configured" });
+  if (!config.aiEnabled) return res.status(400).json({ error: "AI provider is not configured" });
   if (!beginScanTask(scanId, "agent")) return res.status(409).json({ error: "agent loop already running" });
 
   res.status(202).json({ message: "agent loop started", scanId });

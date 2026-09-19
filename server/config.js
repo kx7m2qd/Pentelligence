@@ -12,11 +12,24 @@ function parseList(value) {
     .filter(Boolean);
 }
 
+const requestedAiProvider = String(process.env.AI_PROVIDER || "groq").trim().toLowerCase();
+const aiProvider = requestedAiProvider === "ollama" ? "ollama" : "groq";
+const groqApiKey = String(process.env.GROQ_API_KEY || "").trim();
+const groqModel = String(process.env.GROQ_MODEL || "openai/gpt-oss-20b").trim();
+const ollamaBaseUrl = String(process.env.OLLAMA_BASE_URL || "http://127.0.0.1:11434/v1").trim().replace(/\/$/, "");
+const ollamaModel = String(process.env.OLLAMA_MODEL || "llama3.1:8b").trim();
+
 export const config = {
   port: Number.parseInt(process.env.PORT || "3001", 10),
   appPassword: String(process.env.APP_PASSWORD || "").trim(),
-  groqApiKey: String(process.env.GROQ_API_KEY || "").trim(),
-  groqModel: String(process.env.GROQ_MODEL || "openai/gpt-oss-20b").trim(),
+  aiProvider,
+  aiEnabled: aiProvider === "ollama" || Boolean(groqApiKey),
+  aiModel: aiProvider === "ollama" ? ollamaModel : groqModel,
+  groqApiKey,
+  groqModel,
+  ollamaBaseUrl,
+  ollamaModel,
+  ollamaApiKey: String(process.env.OLLAMA_API_KEY || "").trim(),
   corsOrigins: parseList(process.env.CORS_ORIGINS),
   allowPrivateTargets: parseBoolean(process.env.ALLOW_PRIVATE_TARGETS),
   enableActiveExploitation: parseBoolean(process.env.ENABLE_ACTIVE_EXPLOITATION),

@@ -1,23 +1,37 @@
 import Groq from "groq-sdk";
 import { config } from "../config.js";
 
-const groq = process.env.GROQ_API_KEY ? new Groq({ apiKey: process.env.GROQ_API_KEY }) : null;
-
-function getGroq() {
-  if (!groq) throw new Error("GROQ_API_KEY is not configured");
-  return groq;
-}
+const groq = config.aiProvider === 'groq' && config.groqApiKey ? new Groq({ apiKey: config.groqApiKey }) : null;
 
 function isRetryable(error) {
   const status = Number(error?.status || error?.statusCode || 0);
   return status === 429 || status >= 500 || error?.code === 'ETIMEDOUT' || error?.code === 'ECONNRESET';
 }
 
-async function createCompletion(params) {
+async function createOllamaCompletion(params) {
+  const response = await fetch(`${config.ollamaBaseUrl}/chat/completions`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(config.ollamaApiKey ? { Authorization: `Bearer ${config.ollamaApiKey}` } : {}),
+    },
+    body: JSON.stringify({ ...params, model: config.ollamaModel }),
+    signal: AbortSignal.timeout(120_000),
+  });
+  if (!response.ok) {
+    const detail = (await response.text()).slice(0, 240);
+    throw new Error(`Ollama request failed (${response.status})${detail ? `: ${detail}` : ''}`);
+  }
+  return response.json();
+}
+
+export async function createCompletion(params) {
   let lastError;
   for (let attempt = 0; attempt < 3; attempt += 1) {
     try {
-      return await getGroq().chat.completions.create(params);
+      if (config.aiProvider === 'ollama') return await createOllamaCompletion(params);
+      if (!groq) throw new Error("GROQ_API_KEY is not configured");
+      return await groq.chat.completions.create({ ...params, model: config.groqModel });
     } catch (error) {
       lastError = error;
       if (!isRetryable(error) || attempt === 2) throw error;
@@ -29,16 +43,33 @@ async function createCompletion(params) {
   throw lastError;
 }
 
-export async function checkGroq() {
-  if (!groq) return { configured: false, reachable: false, model: config.groqModel, message: 'GROQ_API_KEY is not configured' };
+export async function checkAI() {
+  if (config.aiProvider === 'ollama') {
+    try {
+      const response = await fetch(`${config.ollamaBaseUrl}/models`, {
+        headers: config.ollamaApiKey ? { Authorization: `Bearer ${config.ollamaApiKey}` } : {},
+        signal: AbortSignal.timeout(5000),
+      });
+      if (!response.ok) throw new Error(`health check returned ${response.status}`);
+      const payload = await response.json();
+      const models = (payload.data || []).map(model => model.id);
+      const available = models.includes(config.ollamaModel);
+      return { provider: 'ollama', configured: true, reachable: true, available, model: config.ollamaModel, message: available ? 'Local Ollama model is available' : `Ollama is reachable; pull ${config.ollamaModel}` };
+    } catch (error) {
+      return { provider: 'ollama', configured: true, reachable: false, available: false, model: config.ollamaModel, message: error?.message || 'Ollama health check failed' };
+    }
+  }
+  if (!groq) return { provider: 'groq', configured: false, reachable: false, model: config.groqModel, message: 'GROQ_API_KEY is not configured' };
   try {
     const response = await groq.models.list();
     const available = (response.data || []).some(model => model.id === config.groqModel);
-    return { configured: true, reachable: available, model: config.groqModel, message: available ? 'Groq model is available' : 'Selected Groq model is unavailable' };
+    return { provider: 'groq', configured: true, reachable: available, available, model: config.groqModel, message: available ? 'Groq model is available' : 'Selected Groq model is unavailable' };
   } catch (error) {
-    return { configured: true, reachable: false, model: config.groqModel, message: error?.message || 'Groq health check failed' };
+    return { provider: 'groq', configured: true, reachable: false, available: false, model: config.groqModel, message: error?.message || 'Groq health check failed' };
   }
 }
+
+export const checkGroq = checkAI;
 
 const SYSTEM_PROMPT = `You are an expert penetration tester and security researcher.
 You analyse scan results and make decisions about what vulnerabilities exist and what to test next.
@@ -76,7 +107,7 @@ Respond with this exact JSON structure:
 }`;
 
   const response = await createCompletion({
-    model: config.groqModel,
+    model: config.aiModel,
     messages: [
       { role: "system", content: SYSTEM_PROMPT },
       { role: "user",   content: prompt },
@@ -114,7 +145,7 @@ Respond with this exact JSON:
 }`;
 
   const response = await createCompletion({
-    model: config.groqModel,
+    model: config.aiModel,
     messages: [
       { role: "system", content: SYSTEM_PROMPT },
       { role: "user",   content: prompt },
@@ -163,7 +194,7 @@ Respond with this exact JSON:
 }`;
 
   const response = await createCompletion({
-    model: config.groqModel,
+    model: config.aiModel,
     messages: [
       { role: "system", content: SYSTEM_PROMPT },
       { role: "user",   content: prompt },

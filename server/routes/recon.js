@@ -136,8 +136,8 @@ async function runReconPipeline(scanId, target, scopeRules = null, excludeRules 
       return;
     }
 
-    if (config.groqApiKey) {
-      setScanState(scanId, { phase: 'agent', message: 'Analysing hosts with Groq' });
+    if (config.aiEnabled) {
+      setScanState(scanId, { phase: 'agent', message: `Analysing hosts with ${config.aiProvider}` });
       await runAgentLoop(scanId, msg => {
         db.prepare("INSERT INTO agent_logs (scan_id, type, content) VALUES (?, ?, ?)")
           .run(scanId, "log", msg);
@@ -382,7 +382,7 @@ router.get('/report/:scanId', async (req, res) => {
 
   let report = null;
 
-  if (config.groqApiKey && findings.length > 0) {
+  if (config.aiEnabled && findings.length > 0) {
     try {
       report = await generateReport({
         target: scan.target,
@@ -390,7 +390,7 @@ router.get('/report/:scanId', async (req, res) => {
         findings,
       });
     } catch (err) {
-      console.error('[report] groq generation failed:', err.message);
+      console.error('[report] AI generation failed:', err.message);
     }
   }
 

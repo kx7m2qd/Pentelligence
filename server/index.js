@@ -13,7 +13,8 @@ import programsRouter from './routes/programs.js';
 import templatesRouter from './routes/templates.js';
 import { config, DEFAULT_DEV_ORIGINS, validateProductionConfig } from './config.js';
 import { getToolReadiness } from './tools.js';
-import { checkGroq } from './modules/groq.js';
+import { checkAI } from './modules/groq.js';
+import { recoverInterruptedScans } from './db.js';
 import { ensureTemplates } from './modules/templates.js';
 import { createWorkspace, requireAccessSession, requireWorkspace } from './workspaces.js';
 
@@ -99,12 +100,25 @@ app.use('/api/templates', templatesRouter);
 
 // health check
 app.get('/api/health', (req, res) =>
-  res.json({ status: 'ok', groq: Boolean(config.groqApiKey), authenticationRequired: Boolean(config.appPassword) })
+  res.json({
+    status: 'ok',
+    ai: { provider: config.aiProvider, configured: config.aiEnabled, model: config.aiModel },
+    authenticationRequired: Boolean(config.appPassword),
+  })
 );
 
+app.get('/api/health/ai', async (req, res, next) => {
+  try {
+    res.json(await checkAI());
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Kept for clients from releases before the provider-neutral AI health route.
 app.get('/api/health/groq', async (req, res, next) => {
   try {
-    res.json(await checkGroq());
+    res.json(await checkAI());
   } catch (err) {
     next(err);
   }
@@ -144,5 +158,7 @@ app.use((err, req, res, next) => {
 
 app.listen(config.port, () => {
   console.log(`[server] running on http://localhost:${config.port}`);
+  const recovered = recoverInterruptedScans();
+  if (recovered > 0) console.log(`[server] recovered ${recovered} interrupted scan${recovered === 1 ? '' : 's'}`);
   ensureTemplates();
 });

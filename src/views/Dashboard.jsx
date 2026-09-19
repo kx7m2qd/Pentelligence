@@ -57,7 +57,7 @@ export default function Dashboard({
   const [stats, setStats] = useState({ hostsFound: 0, openPorts: 0, subdomainsFound: 0 });
   const [decision, setDecision] = useState(null);
   const [toolHealth, setToolHealth] = useState(null);
-  const [groqHealth, setGroqHealth] = useState(null);
+  const [aiHealth, setAiHealth] = useState(null);
   const [templatesInfo, setTemplatesInfo] = useState(null);
   const [noProgramAccepted, setNoProgramAccepted] = useState(false);
   const previousFindingCount = useRef(0);
@@ -65,13 +65,13 @@ export default function Dashboard({
   useEffect(() => {
     const loadToolHealth = async () => {
       try {
-        const [tools, groq, templates] = await Promise.all([
+        const [tools, ai, templates] = await Promise.all([
           apiGet('/health/tools'),
-          apiGet('/health/groq'),
+          apiGet('/health/ai'),
           apiGet('/templates/status').catch(() => null),
         ]);
         setToolHealth(tools);
-        setGroqHealth(groq);
+        setAiHealth(ai);
         setTemplatesInfo(templates);
       } catch (err) {
         console.error('tool readiness failed:', err);
@@ -107,12 +107,12 @@ export default function Dashboard({
     }
   }, [logs, termRef]);
 
-  const tools = (toolHealth?.tools || []).map(tool => tool.id === 'groq' && groqHealth ? {
+  const tools = (toolHealth?.tools || []).map(tool => tool.id === 'ai' && aiHealth ? {
     ...tool,
-    installed: groqHealth.reachable,
-    status: groqHealth.reachable ? 'ready' : 'missing',
-    version: groqHealth.reachable ? groqHealth.model : null,
-    recommendation: groqHealth.message,
+    installed: aiHealth.reachable && aiHealth.available !== false,
+    status: aiHealth.reachable && aiHealth.available !== false ? 'ready' : 'missing',
+    version: aiHealth.reachable ? `${aiHealth.provider} · ${aiHealth.model}` : null,
+    recommendation: aiHealth.message,
   } : tool);
   const readinessSummary = toolHealth?.summary ? {
     ...toolHealth.summary,
@@ -122,7 +122,7 @@ export default function Dashboard({
     { label: 'Subdomain enum', phase: 'subfinder' },
     { label: 'Port scan', phase: 'nmap' },
     { label: 'HTTP probe', phase: 'web' },
-    { label: 'AI ranking (Groq)', phase: 'agent' },
+    { label: `AI ranking${aiHealth?.provider ? ` (${aiHealth.provider})` : ''}`, phase: 'agent' },
     { label: 'Nuclei confirmation', phase: 'nuclei' },
   ].map(module => ({ ...module, status: getModuleStatus(scan, module.phase) }));
 
@@ -385,7 +385,7 @@ export default function Dashboard({
           </div>
           <div ref={termRef} style={{ flex: 1, overflowY: 'auto', padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 3, minHeight: 200 }}>
             {terminalLines.map((line, index) => {
-              const ai = line.includes('Groq:') || line.includes('Agent');
+              const ai = line.includes('AI:') || line.includes('Groq:') || line.includes('Agent');
               const isError = line.toLowerCase().includes('failed') || line.toLowerCase().includes('error');
               return (
                 <div

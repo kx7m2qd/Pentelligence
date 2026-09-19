@@ -4,7 +4,7 @@ services:
       context: .
       args:
         GO_VERSION: ${GO_VERSION:-1.25-bookworm}
-        NODE_VERSION: ${NODE_VERSION:-22-bookworm-slim}
+        NODE_VERSION: ${NODE_VERSION:-24-bookworm-slim}
         NUCLEI_VERSION: ${NUCLEI_VERSION:-latest}
         SUBFINDER_VERSION: ${SUBFINDER_VERSION:-latest}
     image: pentelligence:local

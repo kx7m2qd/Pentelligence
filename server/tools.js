@@ -84,18 +84,22 @@ async function checkBinary(definition) {
 
 export async function getToolReadiness() {
   const tools = await Promise.all(TOOL_DEFINITIONS.map(checkBinary));
-  const groq = {
-    id: 'groq',
-    label: 'Groq AI',
-    command: 'GROQ_API_KEY',
+  const ai = {
+    id: 'ai',
+    label: config.aiProvider === 'ollama' ? 'Ollama AI' : 'Groq AI',
+    command: config.aiProvider === 'ollama' ? 'OLLAMA_BASE_URL' : 'GROQ_API_KEY',
     required: true,
-    installed: Boolean(config.groqApiKey),
-    path: config.groqApiKey ? '.env' : null,
+    installed: config.aiEnabled,
+    path: config.aiEnabled ? (config.aiProvider === 'ollama' ? config.ollamaBaseUrl : '.env') : null,
     version: null,
-    status: config.groqApiKey ? 'ready' : 'missing',
-    recommendation: config.groqApiKey ? null : 'Set GROQ_API_KEY in .env',
+    status: config.aiEnabled ? 'ready' : 'missing',
+    recommendation: config.aiEnabled
+      ? null
+      : config.aiProvider === 'ollama'
+        ? `Start Ollama and pull ${config.ollamaModel}`
+        : 'Set GROQ_API_KEY in .env',
   };
-  const allTools = [...tools, groq];
+  const allTools = [...tools, ai];
   const required = allTools.filter(tool => tool.required);
   const readyRequired = required.filter(tool => tool.installed).length;
 

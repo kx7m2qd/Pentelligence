@@ -291,4 +291,16 @@ db.exec(`
     ON exploit_results(scan_id, host_id, type, target, payload);
 `);
 
+export function recoverInterruptedScans() {
+  const result = db.prepare(`
+    UPDATE scans
+    SET status = 'error',
+        phase = 'error',
+        message = 'Scan interrupted — retry from History',
+        error_message = 'The application stopped before this scan completed'
+    WHERE status = 'running'
+  `).run();
+  return result.changes;
+}
+
 export default db;

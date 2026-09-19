@@ -16,20 +16,20 @@ export async function runAgentLoop(scanId, emitLog) {
   const hosts = db.prepare("SELECT * FROM hosts WHERE scan_id = ?").all(scanId);
   if (!hosts.length) return log("No hosts found to analyse");
 
-  log(`Analysing ${hosts.length} hosts with Groq (${config.groqModel})...`);
+  log(`Analysing ${hosts.length} hosts with ${config.aiProvider} (${config.aiModel})...`);
 
   const allFindings = [];
 
   for (const host of hosts) {
     const ports = db.prepare("SELECT * FROM ports WHERE host_id = ?").all(host.id);
 
-    log(`Groq: Analysing ${host.hostname || host.ip}...`);
+    log(`AI: Analysing ${host.hostname || host.ip}...`);
 
     let analysis;
     try {
       analysis = await analyseHost({ ...host, ports });
     } catch (err) {
-      log(`Groq error on ${host.ip}: ${err.message}`);
+      log(`AI error on ${host.ip}: ${err.message}`);
       continue;
     }
 
@@ -58,7 +58,7 @@ export async function runAgentLoop(scanId, emitLog) {
         host: host.hostname || host.ip,
         severity: cve.score >= 9 ? "CRITICAL" : cve.score >= 7 ? "HIGH" : cve.score >= 4 ? "MEDIUM" : "LOW",
       });
-      log(`Groq: Found ${cve.id} on ${host.hostname || host.ip}:${cve.port} — CVSS ${cve.score}`);
+      log(`AI: Found ${cve.id} on ${host.hostname || host.ip}:${cve.port} — CVSS ${cve.score}`);
     }
 
     // save agent reasoning log
@@ -67,8 +67,8 @@ export async function runAgentLoop(scanId, emitLog) {
       VALUES (?, ?, ?, ?)
     `).run(scanId, host.id, "analysis", JSON.stringify(analysis));
 
-    log(`Groq: ${host.hostname || host.ip} — risk=${analysis.risk}, CVEs=${analysis.cves?.length || 0}`);
-    if (analysis.reasoning) log(`Groq: ${analysis.reasoning}`);
+    log(`AI: ${host.hostname || host.ip} — risk=${analysis.risk}, CVEs=${analysis.cves?.length || 0}`);
+    if (analysis.reasoning) log(`AI: ${analysis.reasoning}`);
 
     // small delay to respect rate limits
     await new Promise(r => setTimeout(r, 600));
@@ -76,13 +76,13 @@ export async function runAgentLoop(scanId, emitLog) {
 
   // final decision
   if (allFindings.length > 0) {
-    log("Groq: All hosts analysed — deciding next action...");
+    log("AI: All hosts analysed — deciding next action...");
 
     let decision;
     try {
       decision = await decideNextAction(allFindings, scan.target);
     } catch (err) {
-      log(`Groq decision error: ${err.message}`);
+      log(`AI decision error: ${err.message}`);
       return;
     }
 
@@ -91,11 +91,11 @@ export async function runAgentLoop(scanId, emitLog) {
       VALUES (?, ?, ?, ?)
     `).run(scanId, null, "decision", JSON.stringify(decision));
 
-    log(`Groq decision: ${decision.next_action?.toUpperCase()} — ${decision.reason}`);
-    log(`Groq: Priority target → ${decision.priority_target}`);
-    log(`Groq: Expected impact → ${decision.estimated_impact}`);
+    log(`AI decision: ${decision.next_action?.toUpperCase()} — ${decision.reason}`);
+    log(`AI: Priority target → ${decision.priority_target}`);
+    log(`AI: Expected impact → ${decision.estimated_impact}`);
   } else {
-    log("Groq: No CVEs found — target may be patched or out of scope");
+    log("AI: No CVEs found — target may be patched or out of scope");
   }
 
   log("Agent loop complete.");

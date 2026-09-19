@@ -21,12 +21,23 @@ Without Docker, every laptop must install those tools manually. With Docker, the
 cp .env.example .env
 ```
 
-2. Configure deployment access in `.env`:
+2. Configure deployment access and an AI provider in `.env`:
 
 ```bash
 APP_PASSWORD=optional-local-access-gate
+AI_PROVIDER=groq
 GROQ_API_KEY=your_key_here
 ```
+
+For private, on-device analysis, use Ollama instead:
+
+```bash
+AI_PROVIDER=ollama
+OLLAMA_BASE_URL=http://127.0.0.1:11434/v1
+OLLAMA_MODEL=llama3.1:8b
+```
+
+Start Ollama and pull the selected model before starting Pentelligence. When Pentelligence runs inside Docker, point `OLLAMA_BASE_URL` at an address the container can reach, such as `http://host.docker.internal:11434/v1` on Docker Desktop.
 
 3. Start the full app:
 
@@ -72,7 +83,7 @@ Findings are separated by source: nuclei template matches are marked confirmed, 
 
 ## Local Development
 
-Use Node.js 22.12 or later (the repository includes `.nvmrc` for version managers that support it).
+Use Node.js 24.21.0 LTS (the repository includes `.nvmrc` for version managers that support it).
 
 Install dependencies:
 
@@ -118,7 +129,9 @@ http://localhost:3001
 
 Important `.env` values:
 
-- `GROQ_API_KEY`: enables AI analysis and report generation.
+- `AI_PROVIDER`: selects `groq` for cloud inference or `ollama` for local/private inference.
+- `GROQ_API_KEY` and `GROQ_MODEL`: configure Groq when `AI_PROVIDER=groq`.
+- `OLLAMA_BASE_URL` and `OLLAMA_MODEL`: configure any Ollama OpenAI-compatible endpoint when `AI_PROVIDER=ollama`.
 - `APP_PASSWORD`: optional local access gate. It protects the web UI with server-side sessions and is never sent to the browser.
 - `SESSION_TTL_HOURS`: how long a signed-in browser may access the application.
 - `ALLOW_PRIVATE_TARGETS`: keep `false` unless you intentionally scan private/internal ranges.
@@ -164,6 +177,8 @@ curl http://localhost:3001/api/health/tools
 - Do not share the deployment password. For a true multi-user deployment, connect the API to an identity provider before granting external access.
 
 The built-in HTTP probe records status, title, server header, content type, response size, redirect location, and response time without requiring a separate `httpx` installation. Nuclei rate limits and retries come from the scan intensity chosen at start: safe is 25 requests per second, balanced 50, fast 100 (no retries). A linked program profile is used as fallback when no intensity is sent. Nuclei templates are read from `NUCLEI_TEMPLATES_DIR` (default `~/nuclei-templates`); when that directory is missing, CVE-specific scans fall back to severity-based default templates.
+
+Scan state is stored in SQLite. If the application stops during a scan, that job is marked as interrupted on the next start and can be retried from History instead of remaining stuck as running.
 
 ## License
 

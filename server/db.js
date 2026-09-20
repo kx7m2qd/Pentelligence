@@ -43,6 +43,22 @@ db.exec(`
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
+  CREATE TABLE IF NOT EXISTS program_schedules (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    program_id INTEGER NOT NULL UNIQUE,
+    workspace_id INTEGER NOT NULL,
+    target TEXT NOT NULL,
+    interval_hours INTEGER NOT NULL DEFAULT 24,
+    enabled INTEGER NOT NULL DEFAULT 0,
+    next_run_at DATETIME,
+    last_run_at DATETIME,
+    last_scan_id INTEGER,
+    last_status TEXT NOT NULL DEFAULT 'never',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (program_id) REFERENCES programs(id),
+    FOREIGN KEY (last_scan_id) REFERENCES scans(id)
+  );
   CREATE TABLE IF NOT EXISTS finding_reviews (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     workspace_id INTEGER NOT NULL,
@@ -61,6 +77,18 @@ db.exec(`
     target TEXT NOT NULL,
     status TEXT DEFAULT 'running',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE TABLE IF NOT EXISTS scan_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    scan_id INTEGER NOT NULL,
+    attempt INTEGER NOT NULL DEFAULT 1,
+    status TEXT NOT NULL,
+    phase TEXT NOT NULL,
+    message TEXT NOT NULL DEFAULT '',
+    error_message TEXT NOT NULL DEFAULT '',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (scan_id) REFERENCES scans(id)
   );
 
   CREATE TABLE IF NOT EXISTS hosts (
@@ -209,6 +237,13 @@ if (!scanColumnNames.has("program_id")) {
 if (!scanColumnNames.has("profile_json")) {
   db.exec("ALTER TABLE scans ADD COLUMN profile_json TEXT DEFAULT '{}'");
 }
+if (!scanColumnNames.has("attempt_count")) {
+  db.exec("ALTER TABLE scans ADD COLUMN attempt_count INTEGER NOT NULL DEFAULT 1");
+}
+if (!scanColumnNames.has("updated_at")) {
+  db.exec("ALTER TABLE scans ADD COLUMN updated_at DATETIME");
+  db.exec("UPDATE scans SET updated_at = created_at WHERE updated_at IS NULL");
+}
 
 const existingWorkspaceColumns = db.prepare("PRAGMA table_info(workspaces)").all();
 const workspaceColumnNames = new Set(existingWorkspaceColumns.map(column => column.name));
@@ -218,11 +253,13 @@ if (!workspaceColumnNames.has("access_session_id")) {
 
 db.exec("CREATE INDEX IF NOT EXISTS idx_scans_workspace_created ON scans(workspace_id, created_at DESC)");
 db.exec("CREATE INDEX IF NOT EXISTS idx_programs_workspace_updated ON programs(workspace_id, updated_at DESC)");
+db.exec("CREATE INDEX IF NOT EXISTS idx_program_schedules_due ON program_schedules(enabled, next_run_at)");
 db.exec("CREATE INDEX IF NOT EXISTS idx_access_sessions_expiry ON access_sessions(expires_at)");
 db.exec("CREATE INDEX IF NOT EXISTS idx_scope_authorizations_workspace_target ON scope_authorizations(workspace_id, target)");
 db.exec("CREATE INDEX IF NOT EXISTS idx_web_assets_scan_host ON web_assets(scan_id, hostname)");
 db.exec("CREATE INDEX IF NOT EXISTS idx_evidence_scan_created ON evidence(scan_id, created_at DESC)");
 db.exec("CREATE INDEX IF NOT EXISTS idx_finding_reviews_workspace_scan ON finding_reviews(workspace_id, scan_id)");
+db.exec("CREATE INDEX IF NOT EXISTS idx_scan_events_scan_created ON scan_events(scan_id, id)");
 
 // Fix stale phase/message on scans that completed before these columns existed
 db.prepare(`
@@ -235,6 +272,20 @@ db.prepare(`
   UPDATE scans
   SET phase = 'error', message = 'Scan failed'
   WHERE status = 'error' AND (phase IS NULL OR phase = '' OR phase = 'queued')
+`).run();
+
+// Existing installations start with one durable baseline event per scan.
+db.prepare(`
+  INSERT INTO scan_events (scan_id, attempt, status, phase, message, error_message, created_at)
+  SELECT s.id,
+         COALESCE(s.attempt_count, 1),
+         COALESCE(s.status, 'running'),
+         COALESCE(s.phase, 'queued'),
+         COALESCE(s.message, ''),
+         COALESCE(s.error_message, ''),
+         COALESCE(s.updated_at, s.created_at, CURRENT_TIMESTAMP)
+  FROM scans s
+  WHERE NOT EXISTS (SELECT 1 FROM scan_events e WHERE e.scan_id = s.id)
 `).run();
 
 db.exec(`
@@ -291,16 +342,45 @@ db.exec(`
     ON exploit_results(scan_id, host_id, type, target, payload);
 `);
 
+export function recordScanEvent(scanId) {
+  const scan = db.prepare(`
+    SELECT id, attempt_count, status, phase, message, error_message
+    FROM scans
+    WHERE id = ?
+  `).get(scanId);
+  if (!scan) return false;
+  db.prepare(`
+    INSERT INTO scan_events (scan_id, attempt, status, phase, message, error_message)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `).run(
+    scan.id,
+    scan.attempt_count || 1,
+    scan.status || 'running',
+    scan.phase || 'queued',
+    scan.message || '',
+    scan.error_message || '',
+  );
+  return true;
+}
+
 export function recoverInterruptedScans() {
-  const result = db.prepare(`
-    UPDATE scans
-    SET status = 'error',
-        phase = 'error',
-        message = 'Scan interrupted — retry from History',
-        error_message = 'The application stopped before this scan completed'
-    WHERE status = 'running'
-  `).run();
-  return result.changes;
+  const interrupted = db.prepare("SELECT id FROM scans WHERE status = 'running'").all();
+  const recover = db.transaction(() => {
+    for (const scan of interrupted) {
+      db.prepare(`
+        UPDATE scans
+        SET status = 'error',
+            phase = 'error',
+            message = 'Scan interrupted — retry from History',
+            error_message = 'The application stopped before this scan completed',
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+      `).run(scan.id);
+      recordScanEvent(scan.id);
+    }
+  });
+  recover();
+  return interrupted.length;
 }
 
 export default db;

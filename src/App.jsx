@@ -142,6 +142,11 @@ export default function App() {
 
   const programName = selectedProgram?.name || null;
 
+  const handleScanUpdate = useCallback(scan => {
+    setScanRecord(scan);
+    if (scan?.status !== 'running') setCancelling(false);
+  }, []);
+
   if (!accessReady) return <div className="app-loading">Loading workspace...</div>;
   if (!authenticated) return <AccessGate initialError={error} onAuthenticated={() => { setError(''); setAuthenticated(true); void ensureWorkspace(); }} />;
 
@@ -240,10 +245,7 @@ export default function App() {
               templateFocus={templateFocus}
               setTemplateFocus={setTemplateFocus}
               templateFocuses={TEMPLATE_FOCUS}
-              onScanUpdate={scan => {
-                setScanRecord(scan);
-                if (scan?.status !== 'running') setCancelling(false);
-              }}
+              onScanUpdate={handleScanUpdate}
               onOpenFindings={() => setActive("findings")}
               onOpenSurface={() => setActive("recon")}
             />

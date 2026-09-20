@@ -1,16 +1,20 @@
 import express from 'express';
 import db from '../db.js';
-import { parseRules } from '../scope.js';
+import { assertInScope, parseRules } from '../scope.js';
+import { assertPublicResolution, normalizeTargetInput } from '../targets.js';
+import { config } from '../config.js';
 
 const router = express.Router();
 
 function serialize(row) {
   if (!row) return null;
+  const schedule = db.prepare('SELECT * FROM program_schedules WHERE program_id = ? AND workspace_id = ?').get(row.id, row.workspace_id) || null;
   return {
     ...row,
     scope: JSON.parse(row.scope_json || '[]'),
     excludes: JSON.parse(row.excludes_json || '[]'),
     profile: JSON.parse(row.profile_json || '{}'),
+    schedule,
   };
 }
 
@@ -45,7 +49,45 @@ router.patch('/:id', (req, res) => {
   res.json({ program: serialize(db.prepare('SELECT * FROM programs WHERE id = ?').get(program.id)) });
 });
 
+router.patch('/:id/schedule', async (req, res) => {
+  const program = db.prepare('SELECT * FROM programs WHERE id = ? AND workspace_id = ?').get(Number(req.params.id), req.workspaceId);
+  if (!program) return res.status(404).json({ error: 'program not found' });
+  const enabled = req.body?.enabled === true;
+  const intervalHours = Number(req.body?.intervalHours);
+  if (![24, 168].includes(intervalHours)) return res.status(400).json({ error: 'schedule cadence must be daily or weekly' });
+  let target;
+  try {
+    target = normalizeTargetInput(req.body?.target, { allowPrivateTargets: config.allowPrivateTargets }).normalizedTarget;
+    assertInScope(target, { scope: JSON.parse(program.scope_json || '[]'), excludes: JSON.parse(program.excludes_json || '[]') });
+    await assertPublicResolution(target, { allowPrivateTargets: config.allowPrivateTargets });
+  } catch (err) {
+    return res.status(400).json({ error: err.message });
+  }
+  if (enabled && req.body?.authorizationConfirmed !== true) {
+    return res.status(400).json({ error: 'recurring authorization confirmation is required' });
+  }
+  if (enabled) {
+    db.prepare(`INSERT INTO scope_authorizations (workspace_id, target, authorization_note) VALUES (?, ?, ?)`)
+      .run(req.workspaceId, target, `Recurring ${intervalHours === 24 ? 'daily' : 'weekly'} monitoring authorized for program ${program.name}`);
+  }
+  db.prepare(`
+    INSERT INTO program_schedules (program_id, workspace_id, target, interval_hours, enabled, next_run_at, last_status)
+    VALUES (?, ?, ?, ?, ?, CASE WHEN ? = 1 THEN datetime('now', '+' || ? || ' hours') ELSE NULL END, 'never')
+    ON CONFLICT(program_id) DO UPDATE SET
+      target = excluded.target,
+      interval_hours = excluded.interval_hours,
+      enabled = excluded.enabled,
+      next_run_at = CASE
+        WHEN excluded.enabled = 1 THEN datetime('now', '+' || excluded.interval_hours || ' hours')
+        ELSE NULL
+      END,
+      updated_at = CURRENT_TIMESTAMP
+  `).run(program.id, req.workspaceId, target, intervalHours, enabled ? 1 : 0, enabled ? 1 : 0, intervalHours);
+  res.json({ program: serialize(db.prepare('SELECT * FROM programs WHERE id = ?').get(program.id)) });
+});
+
 router.delete('/:id', (req, res) => {
+  db.prepare('DELETE FROM program_schedules WHERE program_id = ? AND workspace_id = ?').run(Number(req.params.id), req.workspaceId);
   const result = db.prepare('DELETE FROM programs WHERE id = ? AND workspace_id = ?').run(Number(req.params.id), req.workspaceId);
   if (!result.changes) return res.status(404).json({ error: 'program not found' });
   res.status(204).end();

@@ -20,6 +20,15 @@ function baseDomainOf(hostname) {
   return parts.slice(-2).join(".");
 }
 
+function stableUnit(value, salt = 0) {
+  let hash = 2166136261 ^ salt;
+  for (const character of String(value)) {
+    hash ^= character.charCodeAt(0);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0) / 4294967295;
+}
+
 function buildGraph(hosts, subdomains, target) {
   const nodes = [];
   const links = [];
@@ -84,8 +93,11 @@ export default function TopologyMap({
   const graph = useMemo(() => buildGraph(hosts, subdomains, target), [hosts, subdomains, target]);
   const svgRef = useRef(null);
   const [view, setView] = useState({ x: 0, y: 0, k: 1 });
+  const [motionEnabled, setMotionEnabled] = useState(true);
+  const [hoveredNode, setHoveredNode] = useState(null);
   const dragRef = useRef(null);
   const wakeRef = useRef(null);
+  const motionRef = useRef(true);
   const [sim, setSim] = useState(null);
 
   useEffect(() => {
@@ -97,10 +109,11 @@ export default function TopologyMap({
     for (const n of nodes) {
       if (n.kind === "root") { n.x = CENTER_X; n.y = CENTER_Y; }
       else {
-        const angle = Math.random() * Math.PI * 2;
+        const angle = stableUnit(n.id, 17) * Math.PI * 2;
         const radius = n.kind === "sub" ? 110 : n.kind === "host" ? 160 : 40;
-        n.x = (n.parentSeed?.x ?? CENTER_X) + Math.cos(angle) * radius * (0.6 + Math.random() * 0.6);
-        n.y = (n.parentSeed?.y ?? CENTER_Y) + Math.sin(angle) * radius * (0.6 + Math.random() * 0.6);
+        const spread = 0.6 + stableUnit(n.id, 31) * 0.6;
+        n.x = (n.parentSeed?.x ?? CENTER_X) + Math.cos(angle) * radius * spread;
+        n.y = (n.parentSeed?.y ?? CENTER_Y) + Math.sin(angle) * radius * spread;
       }
       n.vx = 0; n.vy = 0;
     }
@@ -150,9 +163,10 @@ export default function TopologyMap({
         n.vy += (CENTER_Y - n.y) * g * alpha * 10;
         // A live scan should feel live without constantly rearranging the
         // operator's mental model: hosts receive only a tiny telemetry drift.
-        if (scanning && n.kind === "host") {
-          n.vx += Math.sin(now * 1.7 + n.hostIndex) * 0.012;
-          n.vy += Math.cos(now * 1.3 + n.hostIndex) * 0.012;
+        if (motionRef.current && n.kind === "host") {
+          const intensity = scanning ? 0.014 : 0.004;
+          n.vx += Math.sin(now * 1.7 + n.hostIndex) * intensity;
+          n.vy += Math.cos(now * 1.3 + n.hostIndex) * intensity;
         }
         if (n.kind !== "root") { n.vx *= 0.85; n.vy *= 0.85; }
         if (dragRef.current?.id !== n.id) { n.x += n.vx; n.y += n.vy; }
@@ -163,9 +177,8 @@ export default function TopologyMap({
       setSim({ nodes, index, links });
       simRef.current = { nodes, index, links };
 
-      // sleep when the layout has settled and nothing is being dragged —
-      // avoids burning a re-render per frame on a static map
-      if (maxMotion < 0.05 && !dragRef.current && !scanning) {
+      // Sleep when the operator pauses motion and the layout has settled.
+      if (maxMotion < 0.05 && !dragRef.current && !scanning && !motionRef.current) {
         raf = null;
         return;
       }
@@ -176,6 +189,11 @@ export default function TopologyMap({
     raf = requestAnimationFrame(step);
     return () => cancelAnimationFrame(raf);
   }, [graph, scanning]);
+
+  useEffect(() => {
+    motionRef.current = motionEnabled;
+    if (motionEnabled) wakeRef.current?.();
+  }, [motionEnabled]);
 
   const nodeById = sim?.index || new Map();
   const simRef = useRef(null);
@@ -233,6 +251,20 @@ export default function TopologyMap({
   const startPan = event => {
     dragRef.current = { pan: true, startX: event.clientX, startY: event.clientY, vx: view.x, vy: view.y };
   };
+
+  const zoomBy = factor => {
+    setView(current => {
+      const k = Math.min(Math.max(current.k * factor, 0.4), 3);
+      const ratio = k / current.k;
+      return {
+        x: CENTER_X - (CENTER_X - current.x) * ratio,
+        y: CENTER_Y - (CENTER_Y - current.y) * ratio,
+        k,
+      };
+    });
+  };
+
+  const resetView = () => setView({ x: 0, y: 0, k: 1 });
 
   // React attaches wheel as passive on some targets, which makes
   // preventDefault() a no-op; attach a native non-passive listener instead.
@@ -348,6 +380,8 @@ export default function TopologyMap({
                 transform={`translate(${n.x},${n.y})`}
                 style={{ cursor: isHost ? "pointer" : "grab" }}
                 onPointerDown={e => startNodeDrag(e, n)}
+                onPointerEnter={() => setHoveredNode(n)}
+                onPointerLeave={() => setHoveredNode(current => current?.id === n.id ? null : current)}
               >
                 {isHost && hostFindings[n.hostIndex] && (
                   <circle
@@ -404,6 +438,35 @@ export default function TopologyMap({
           <span key={label} style={{ fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".08em", color, padding: "5px 7px", border: "1px solid var(--border)", borderRadius: 4, background: "rgba(10,16,13,.78)" }}>{label} <strong>{value}</strong></span>
         ))}
       </div>
+      <div className="surface-map-controls" aria-label="Attack surface map controls">
+        <button type="button" onClick={() => zoomBy(1.2)} aria-label="Zoom in">＋</button>
+        <button type="button" onClick={() => zoomBy(0.82)} aria-label="Zoom out">−</button>
+        <button type="button" onClick={resetView}>CENTER</button>
+        <button
+          type="button"
+          className={motionEnabled ? "active" : ""}
+          onClick={() => setMotionEnabled(value => !value)}
+          aria-pressed={motionEnabled}
+        >
+          {motionEnabled ? "MOTION ON" : "MOTION OFF"}
+        </button>
+      </div>
+      {hoveredNode && (
+        <div className="surface-map-inspector">
+          <span>{hoveredNode.kind.toUpperCase()}</span>
+          <strong>{hoveredNode.label}</strong>
+          {hoveredNode.kind === "host" && (
+            <small>
+              {hoveredNode.ip} · {hoveredNode.ports.length} open port{hoveredNode.ports.length === 1 ? "" : "s"} · {(hoveredNode.risk || "unknown").toUpperCase()} risk
+            </small>
+          )}
+          {hoveredNode.kind === "port" && (
+            <small>{hoveredNode.port.service || "unknown service"} · {hoveredNode.port.protocol || "tcp"}</small>
+          )}
+          {hoveredNode.kind === "sub" && <small>Discovered subdomain</small>}
+          {hoveredNode.kind === "root" && <small>Investigation root</small>}
+        </div>
+      )}
       <div style={{
         position: "absolute", bottom: 8, left: 12, right: 12,
         display: "flex", gap: 14, fontFamily: "var(--mono)", fontSize: 9, color: "var(--t3)",
@@ -413,7 +476,7 @@ export default function TopologyMap({
         <span><span style={{ color: "rgba(184,255,87,.6)" }}>◌</span> subdomain</span>
         <span><span style={{ color: "var(--t2)" }}>●</span> host (ring = risk)</span>
         <span><span style={{ color: "var(--t3)" }}>·</span> open port</span>
-        <span style={{ marginLeft: "auto" }}>{scanning ? "live — updating…" : "drag nodes · scroll to zoom"}</span>
+        <span style={{ marginLeft: "auto" }}>{scanning ? "live — updating…" : "drag nodes · hover to inspect"}</span>
       </div>
     </div>
   );

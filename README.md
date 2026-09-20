@@ -70,16 +70,20 @@ Docker Compose creates named volumes:
 
 Stopping the container does not delete scan history.
 
+Every scan also keeps an append-only phase timeline and attempt number in SQLite. Retries remain attributable to the same investigation, and database backups include this execution history for future replay and resume features.
+
 ## Using the Workspace
 
 The UI is organized around one investigation at a time:
 
 - **Setup** (shown when nothing is running): pick the target, link a bounty program, choose scan intensity (safe / balanced / fast) and port coverage (quick / standard / full), then confirm you are authorized. Without a linked program a second confirmation is required, and scans stay restricted to the single target entered.
-- **Investigation** nav stages: Live (progress and engine log), Surface (topology map, hosts, HTTP services, subdomains), Findings (inbox with filters and review states), Report (preview plus Markdown/JSON export).
+- **Investigation** nav stages: Live (progress and engine log), Surface (stable animated topology map with zoom, motion and node inspection controls; hosts, HTTP services, subdomains), Findings (inbox with filters and review states), Report (preview plus Markdown/JSON export).
 - **Workspace** nav: Programs (scope rules) and History (previous scans).
 - **Advanced** nav: Nuclei rerun and active checks. Active checks are off by default and must be armed per investigation.
 
 Findings are separated by source: nuclei template matches are marked confirmed, AI suggestions are labelled as suggestions and never counted as confirmed.
+
+Programs can optionally watch one exact in-scope target every 24 hours or every 7 days. The first run waits for the selected cadence, overlapping scans are rejected, and Discord stays quiet unless a scheduled scan finds new/regressed exposure or fails operationally.
 
 ## Local Development
 

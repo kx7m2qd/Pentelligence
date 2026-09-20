@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { apiDelete, apiGet, apiPost } from '../lib/api';
+import { apiDelete, apiGet, apiPatch, apiPost } from '../lib/api';
 import { Btn } from '../components/common/Btn';
 import { Card } from '../components/common/Card';
 import { CH } from '../components/common/CH';
@@ -51,6 +51,8 @@ export default function Programs({ selectedProgram, onSelect }) {
   const [error, setError] = useState('');
   const [testTarget, setTestTarget] = useState('');
   const [activeTesterProgramId, setActiveTesterProgramId] = useState(null);
+  const [scheduleDraft, setScheduleDraft] = useState({ target: '', intervalHours: '24', authorizationConfirmed: false });
+  const [savingSchedule, setSavingSchedule] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -68,6 +70,16 @@ export default function Programs({ selectedProgram, onSelect }) {
 
   const scopeResult = validateScope(testTarget, effectiveProgram);
 
+  useEffect(() => {
+    if (!effectiveProgram) return;
+    const defaultTarget = (effectiveProgram.scope || []).find(rule => !rule.startsWith('*.')) || '';
+    setScheduleDraft({
+      target: effectiveProgram.schedule?.target || defaultTarget,
+      intervalHours: String(effectiveProgram.schedule?.interval_hours || 24),
+      authorizationConfirmed: false,
+    });
+  }, [effectiveProgram]);
+
   const create = async event => {
     event.preventDefault();
     setError('');
@@ -82,6 +94,27 @@ export default function Programs({ selectedProgram, onSelect }) {
   const remove = async id => {
     try { await apiDelete(`/programs/${id}`); setPrograms(current => current.filter(program => program.id !== id)); if (selectedProgram?.id === id) onSelect(null); }
     catch (err) { setError(err.message); }
+  };
+
+  const saveSchedule = async enabled => {
+    if (!effectiveProgram) return;
+    setSavingSchedule(true);
+    setError('');
+    try {
+      const response = await apiPatch(`/programs/${effectiveProgram.id}/schedule`, {
+        target: scheduleDraft.target,
+        intervalHours: Number(scheduleDraft.intervalHours),
+        enabled,
+        authorizationConfirmed: enabled && scheduleDraft.authorizationConfirmed,
+      });
+      setPrograms(current => current.map(program => program.id === response.program.id ? response.program : program));
+      if (selectedProgram?.id === response.program.id) onSelect(response.program);
+      setScheduleDraft(current => ({ ...current, authorizationConfirmed: false }));
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSavingSchedule(false);
+    }
   };
 
   return (
@@ -149,6 +182,58 @@ export default function Programs({ selectedProgram, onSelect }) {
                     {scopeResult.status.toUpperCase().replace('_', ' ')}
                   </span>
                 )}
+              </div>
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {effectiveProgram && (
+        <div style={{ marginTop: 18 }}>
+          <Card>
+            <CH
+              left="CONTINUOUS PROGRAM WATCH"
+              right={effectiveProgram.schedule?.enabled ? `ACTIVE · ${effectiveProgram.schedule.interval_hours === 24 ? 'DAILY' : 'WEEKLY'}` : 'PAUSED'}
+            />
+            <div style={{ padding: '16px 20px', display: 'grid', gap: 12 }}>
+              <p style={{ margin: 0, color: 'var(--t2)', fontSize: 12, lineHeight: 1.6 }}>
+                Re-scan one explicitly authorized in-scope target and send Discord alerts only for new or regressed findings. Enabling starts the first run after the selected cadence—not immediately.
+              </p>
+              <div style={{ display: 'grid', gridTemplateColumns: 'minmax(220px, 1fr) 180px', gap: 10 }}>
+                <input
+                  value={scheduleDraft.target}
+                  onChange={event => setScheduleDraft(current => ({ ...current, target: event.target.value }))}
+                  placeholder="Exact in-scope hostname to monitor"
+                  style={{ padding: '10px 12px', borderRadius: 7, border: '1px solid var(--border2)', background: 'var(--s2)', color: 'var(--t1)', fontFamily: 'var(--mono)', fontSize: 11 }}
+                />
+                <select
+                  value={scheduleDraft.intervalHours}
+                  onChange={event => setScheduleDraft(current => ({ ...current, intervalHours: event.target.value }))}
+                  style={{ padding: '10px 12px', borderRadius: 7, border: '1px solid var(--border2)', background: 'var(--s2)', color: 'var(--t1)', fontFamily: 'var(--mono)', fontSize: 11 }}
+                >
+                  <option value="24">Daily · every 24 hours</option>
+                  <option value="168">Weekly · every 7 days</option>
+                </select>
+              </div>
+              <label className="authorized-note" style={{ marginTop: 0, cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={scheduleDraft.authorizationConfirmed}
+                  onChange={event => setScheduleDraft(current => ({ ...current, authorizationConfirmed: event.target.checked }))}
+                  style={{ accentColor: 'var(--acc)' }}
+                />
+                I confirm recurring scans are authorized for this exact target and program scope.
+              </label>
+              {effectiveProgram.schedule && (
+                <div style={{ color: 'var(--t3)', fontFamily: 'var(--mono)', fontSize: 10 }}>
+                  Last: {effectiveProgram.schedule.last_run_at || 'never'} · Next: {effectiveProgram.schedule.next_run_at || 'not scheduled'} · Result: {effectiveProgram.schedule.last_status || 'never'}
+                </div>
+              )}
+              <div style={{ display: 'flex', gap: 8 }}>
+                <Btn accent onClick={() => void saveSchedule(true)} disabled={savingSchedule || !scheduleDraft.target.trim() || !scheduleDraft.authorizationConfirmed}>
+                  {savingSchedule ? 'SAVING…' : effectiveProgram.schedule?.enabled ? 'UPDATE SCHEDULE' : 'ENABLE WATCH'}
+                </Btn>
+                {effectiveProgram.schedule?.enabled ? <Btn onClick={() => void saveSchedule(false)} disabled={savingSchedule}>PAUSE WATCH</Btn> : null}
               </div>
             </div>
           </Card>

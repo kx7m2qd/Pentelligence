@@ -146,7 +146,7 @@ export default function History({ currentScanId, onOpenScan, onStartFresh }) {
                     {scan.target}
                   </div>
                   <div style={{ fontFamily: 'var(--mono)', fontSize: 10, color: 'var(--t3)', marginTop: 4 }}>
-                    Scan #{scan.id}
+                    Scan #{scan.id} · Attempt {scan.attempt_count || 1}
                   </div>
                 </div>
 

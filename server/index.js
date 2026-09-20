@@ -17,6 +17,7 @@ import { checkAI } from './modules/groq.js';
 import { recoverInterruptedScans } from './db.js';
 import { ensureTemplates } from './modules/templates.js';
 import { createWorkspace, requireAccessSession, requireWorkspace } from './workspaces.js';
+import { startScheduler } from './scheduler.js';
 
 validateProductionConfig();
 
@@ -161,4 +162,5 @@ app.listen(config.port, () => {
   const recovered = recoverInterruptedScans();
   if (recovered > 0) console.log(`[server] recovered ${recovered} interrupted scan${recovered === 1 ? '' : 's'}`);
   ensureTemplates();
+  startScheduler();
 });

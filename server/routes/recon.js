@@ -1,7 +1,7 @@
 import path from 'node:path';
 import fs from 'node:fs';
 import express from 'express';
-import db from '../db.js';
+import db, { recordScanEvent } from '../db.js';
 import { config } from '../config.js';
 import { runNmap } from '../modules/nmap.js';
 import { runSubfinder } from '../modules/subfinder.js';
@@ -41,7 +41,8 @@ function setScanState(scanId, updates) {
 
   if (fields.length === 0) return;
 
-  db.prepare(`UPDATE scans SET ${fields.join(', ')} WHERE id = ?`).run(...values, scanId);
+  db.prepare(`UPDATE scans SET ${fields.join(', ')}, updated_at = CURRENT_TIMESTAMP WHERE id = ?`).run(...values, scanId);
+  recordScanEvent(scanId);
 }
 
 function scanStreamSnapshot(workspaceId, scanId) {
@@ -89,7 +90,7 @@ function buildReportSummary(scan, hosts, findings, exploitResults) {
   };
 }
 
-async function runReconPipeline(scanId, target, scopeRules = null, excludeRules = []) {
+export async function runReconPipeline(scanId, target, scopeRules = null, excludeRules = [], options = {}) {
   if (!beginScanTask(scanId, 'pipeline')) {
     return;
   }
@@ -153,17 +154,44 @@ async function runReconPipeline(scanId, target, scopeRules = null, excludeRules 
     checkCancellation();
 
     setScanState(scanId, { status: 'done', phase: 'done', message: 'Recon pipeline complete', error_message: '' });
-    void notifyScanEvent({ target, message: 'scan complete' });
+    if (options.notifyCompletion !== false) void notifyScanEvent({ target, message: 'scan complete' });
   } catch (err) {
     console.error('[recon] pipeline error:', err.message);
     setScanState(scanId, err.code === 'SCAN_CANCELLED'
       ? { status: 'cancelled', phase: 'cancelled', message: 'Scan cancelled by operator', error_message: '' }
       : { status: 'error', phase: 'error', message: 'Recon pipeline failed', error_message: err.message });
-    void notifyScanEvent({ target, message: `scan failed: ${err.message}` });
+    if (options.notifyFailure !== false) void notifyScanEvent({ target, message: `scan failed: ${err.message}` });
   } finally {
     clearScanCancellation(scanId);
     endScanTask(scanId, 'pipeline');
   }
+}
+
+export async function runScheduledProgramScan(schedule) {
+  const program = db.prepare('SELECT * FROM programs WHERE id = ? AND workspace_id = ?').get(schedule.program_id, schedule.workspace_id);
+  if (!program) throw new Error('scheduled program no longer exists');
+  const target = normalizeTargetInput(schedule.target, { allowPrivateTargets: config.allowPrivateTargets }).normalizedTarget;
+  const scopeRules = JSON.parse(program.scope_json || '[]');
+  const excludeRules = JSON.parse(program.excludes_json || '[]');
+  assertInScope(target, { scope: scopeRules, excludes: excludeRules });
+  await assertPublicResolution(target, { allowPrivateTargets: config.allowPrivateTargets });
+  if (getActiveTaskCount() >= config.maxConcurrentScans) throw new Error('scan capacity reached');
+  const existing = db.prepare(`SELECT id FROM scans WHERE target = ? AND workspace_id = ? AND status = 'running' LIMIT 1`).get(target, schedule.workspace_id);
+  if (existing) throw new Error('target already has a running scan');
+  db.prepare(`INSERT INTO scope_authorizations (workspace_id, target, authorization_note) VALUES (?, ?, ?)`)
+    .run(schedule.workspace_id, target, `Authorized recurring scan for program ${program.name}`);
+  let profile = {};
+  try { profile = JSON.parse(program.profile_json || '{}'); } catch { profile = {}; }
+  profile.portProfile = profile.portProfile || 'standard';
+  profile.templateTags = sanitizeTemplateTags(profile.templateTags);
+  const result = db.prepare(`
+    INSERT INTO scans (target, status, phase, message, error_message, workspace_id, program_id, profile_json)
+    VALUES (?, 'running', 'queued', 'Scheduled monitoring scan queued', '', ?, ?, ?)
+  `).run(target, schedule.workspace_id, program.id, JSON.stringify(profile));
+  const scanId = Number(result.lastInsertRowid);
+  recordScanEvent(scanId);
+  await runReconPipeline(scanId, target, scopeRules, excludeRules, { notifyCompletion: false, notifyFailure: false });
+  return db.prepare('SELECT * FROM scans WHERE id = ?').get(scanId);
 }
 
 // POST /api/recon/start
@@ -248,6 +276,7 @@ router.post('/start', async (req, res) => {
     VALUES (?, 'running', 'queued', 'Scan queued', '', ?, ?, ?)
   `).run(normalizedTarget, req.workspaceId, program?.id || null, JSON.stringify(profile));
   const scanId = Number(scan.lastInsertRowid);
+  recordScanEvent(scanId);
 
   res.status(202).json({ scanId, message: 'recon started', target: normalizedTarget });
 
@@ -312,6 +341,7 @@ router.get('/status/:scanId', (req, res) => {
     subdomains: subdomains.map(subdomain => subdomain.subdomain),
     webAssets: db.prepare('SELECT * FROM web_assets WHERE scan_id = ? ORDER BY hostname ASC').all(scanId),
     evidence: db.prepare('SELECT id, type, target, path, metadata_json, created_at FROM evidence WHERE scan_id = ? ORDER BY created_at DESC').all(scanId),
+    timeline: db.prepare('SELECT attempt, status, phase, message, error_message, created_at FROM scan_events WHERE scan_id = ? ORDER BY id ASC').all(scanId),
     stats: {
       hostsFound: hosts.length,
       subdomainsFound: subdomains.length,
@@ -428,6 +458,8 @@ router.delete('/scan/:scanId', (req, res) => {
   db.prepare('DELETE FROM subdomains WHERE scan_id = ?').run(scanId);
   db.prepare('DELETE FROM web_assets WHERE scan_id = ?').run(scanId);
   db.prepare('DELETE FROM evidence WHERE scan_id = ?').run(scanId);
+  db.prepare('DELETE FROM scan_events WHERE scan_id = ?').run(scanId);
+  db.prepare('UPDATE program_schedules SET last_scan_id = NULL WHERE last_scan_id = ?').run(scanId);
   db.prepare('DELETE FROM scans WHERE id = ?').run(scanId);
   res.json({ message: 'scan deleted' });
 });
@@ -464,6 +496,7 @@ router.post('/retry/:scanId', async (req, res) => {
   const scopeRules = program ? JSON.parse(program.scope_json || '[]') : null;
   const excludeRules = program ? JSON.parse(program.excludes_json || '[]') : [];
 
+  db.prepare('UPDATE scans SET attempt_count = attempt_count + 1 WHERE id = ?').run(scan.id);
   setScanState(scan.id, {
     status: 'running',
     phase: 'queued',
@@ -489,6 +522,7 @@ router.get('/backup', (req, res) => {
   let exploitResults = [];
   let agentLogs = [];
   let reviews = [];
+  let scanEvents = [];
 
   if (scanIds.length > 0) {
     const placeholders = scanIds.map(() => '?').join(',');
@@ -500,6 +534,7 @@ router.get('/backup', (req, res) => {
     exploitResults = db.prepare(`SELECT * FROM exploit_results WHERE scan_id IN (${placeholders})`).all(...scanIds);
     agentLogs = db.prepare(`SELECT * FROM agent_logs WHERE scan_id IN (${placeholders})`).all(...scanIds);
     reviews = db.prepare(`SELECT * FROM finding_reviews WHERE workspace_id = ?`).all(req.workspaceId);
+    scanEvents = db.prepare(`SELECT * FROM scan_events WHERE scan_id IN (${placeholders}) ORDER BY id ASC`).all(...scanIds);
 
     const hostIds = hosts.map(h => h.id);
     if (hostIds.length > 0) {
@@ -509,7 +544,7 @@ router.get('/backup', (req, res) => {
   }
 
   const backupData = {
-    version: '1.0',
+    version: '1.1',
     exported_at: new Date().toISOString(),
     workspace_id: req.workspaceId,
     programs,
@@ -523,6 +558,7 @@ router.get('/backup', (req, res) => {
     exploitResults,
     agentLogs,
     reviews,
+    scanEvents,
   };
 
   const filename = `pentelligence-backup-${new Date().toISOString().slice(0, 10)}.json`;

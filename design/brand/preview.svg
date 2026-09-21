@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="1000" viewBox="0 0 1440 1000" role="img" aria-labelledby="title desc">
+  <title id="title">Pentelligence — Connected P identity concept</title>
+  <desc id="desc">Lime connected-node P with a wordmark on charcoal, monochrome variants, small-size marks, and a terminal treatment.</desc>
+  <defs>
+    <g id="mark">
+      <path d="M32 108V28H76L100 52V60L80 80H32" fill="none" stroke="currentColor" stroke-width="12" stroke-linejoin="round" stroke-linecap="round"/>
+      <g fill="currentColor"><circle cx="32" cy="28" r="10"/><circle cx="100" cy="52" r="10"/><circle cx="32" cy="108" r="10"/></g>
+    </g>
+  </defs>
+  <rect width="1440" height="1000" fill="#080b0d"/>
+  <g font-family="Arial, sans-serif">
+    <text x="64" y="61" fill="#a0b1a9" font-size="13" letter-spacing="3">PENTELLIGENCE / IDENTITY STUDY 01</text>
+    <text x="1376" y="61" text-anchor="end" fill="#a0b1a9" font-size="13">CONNECTED P</text>
+    <path d="M64 85H1376" stroke="#263033"/>
+    <use href="#mark" transform="translate(144 177) scale(2)" color="#b6f765"/>
+    <text x="452" y="325" fill="#f0f7f2" font-size="100" font-weight="600" letter-spacing="-5">pentelligence</text>
+    <text x="457" y="373" fill="#a0b1a9" font-size="17" letter-spacing="3">DISCOVER. CONNECT. INVESTIGATE.</text>
+    <text x="64" y="489" fill="#a0b1a9" font-size="14">One continuous path. Three connection points. A clear initial.</text>
+    <rect x="64" y="529" width="415" height="272" rx="16" fill="#b6f765"/>
+    <text x="88" y="564" fill="#26331b" font-size="11" letter-spacing="2">01 / LIGHT APPLICATION</text>
+    <use href="#mark" transform="translate(208 585)" color="#080b0d"/>
+    <text x="272" y="767" text-anchor="middle" fill="#080b0d" font-size="23" font-weight="600" letter-spacing="-1">pentelligence</text>
+    <rect x="496" y="529" width="415" height="272" rx="16" fill="#141b1e"/>
+    <text x="520" y="564" fill="#a0b1a9" font-size="11" letter-spacing="2">02 / SINGLE COLOUR</text>
+    <use href="#mark" transform="translate(640 585)" color="#ffffff"/>
+    <text x="704" y="767" text-anchor="middle" fill="#ffffff" font-size="23" font-weight="600" letter-spacing="-1">pentelligence</text>
+    <rect x="928" y="529" width="448" height="272" rx="16" fill="#101618" stroke="#263033"/>
+    <text x="952" y="564" fill="#a0b1a9" font-size="11" letter-spacing="2">03 / SMALL SIZES + TERMINAL</text>
+    <use href="#mark" transform="translate(960 601) scale(.5)" color="#b6f765"/>
+    <use href="#mark" transform="translate(1054 625) scale(.25)" color="#b6f765"/>
+    <use href="#mark" transform="translate(1120 633) scale(.1875)" color="#b6f765"/>
+    <use href="#mark" transform="translate(1178 641) scale(.125)" color="#b6f765"/>
+    <g fill="#a0b1a9" font-size="10"><text x="982" y="684">64</text><text x="1063" y="684">32</text><text x="1125" y="684">24</text><text x="1179" y="684">16</text></g>
+    <text x="953" y="738" fill="#b6f765" font-family="monospace" font-size="17">[P&gt;] pentelligence</text>
+    <text x="953" y="769" fill="#a0b1a9" font-family="monospace" font-size="12">recon / evidence / intelligence</text>
+    <path d="M64 848H1376" stroke="#263033"/>
+    <circle cx="74" cy="883" r="10" fill="#b6f765"/><text x="97" y="888" fill="#a0b1a9" font-size="13">SIGNAL LIME #B6F765</text>
+    <circle cx="407" cy="883" r="10" fill="#080b0d" stroke="#60706a"/><text x="430" y="888" fill="#a0b1a9" font-size="13">CHARCOAL #080B0D</text>
+    <circle cx="735" cy="883" r="10" fill="#f0f7f2"/><text x="758" y="888" fill="#a0b1a9" font-size="13">OFF WHITE #F0F7F2</text>
+    <text x="64" y="954" fill="#60706a" font-size="12">CONCEPT FOR REVIEW / VECTOR MASTER / NO APP CHANGES</text>
+  </g>
+</svg>

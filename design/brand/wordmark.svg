@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 660 128" role="img" aria-labelledby="title">
+  <title id="title">Pentelligence logo and wordmark concept</title>
+  <path d="M32 108V28H76L100 52V60L80 80H32" fill="none" stroke="#b6f765" stroke-width="12" stroke-linejoin="round" stroke-linecap="round"/>
+  <g fill="#b6f765"><circle cx="32" cy="28" r="10"/><circle cx="100" cy="52" r="10"/><circle cx="32" cy="108" r="10"/></g>
+  <text x="150" y="83" fill="#f0f7f2" font-family="Space Grotesk, Arial, sans-serif" font-size="64" font-weight="600" letter-spacing="-3">pentelligence</text>
+</svg>

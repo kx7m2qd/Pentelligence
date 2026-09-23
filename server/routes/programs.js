@@ -3,6 +3,7 @@ import db from '../db.js';
 import { assertInScope, parseRules } from '../scope.js';
 import { assertPublicResolution, normalizeTargetInput } from '../targets.js';
 import { config } from '../config.js';
+import { schedulePauseHandler } from '../schedulePause.js';
 
 const router = express.Router();
 
@@ -49,10 +50,10 @@ router.patch('/:id', (req, res) => {
   res.json({ program: serialize(db.prepare('SELECT * FROM programs WHERE id = ?').get(program.id)) });
 });
 
-router.patch('/:id/schedule', async (req, res) => {
+router.patch('/:id/schedule', schedulePauseHandler(db, serialize), async (req, res) => {
   const program = db.prepare('SELECT * FROM programs WHERE id = ? AND workspace_id = ?').get(Number(req.params.id), req.workspaceId);
   if (!program) return res.status(404).json({ error: 'program not found' });
-  const enabled = req.body?.enabled === true;
+  const enabled = req.body.enabled;
   const intervalHours = Number(req.body?.intervalHours);
   if (![24, 168].includes(intervalHours)) return res.status(400).json({ error: 'schedule cadence must be daily or weekly' });
   let target;

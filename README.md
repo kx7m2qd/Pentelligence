@@ -149,6 +149,8 @@ Programs can watch one exact in-scope target every **24 hours** or **7 days** af
 
 The first successful scheduled investigation establishes a baseline. Later runs send Discord alerts for new/regressed findings or operational failures. Overlapping scans of the target are rejected.
 
+Pausing prevents future scheduled runs without revalidating DNS or scope and preserves the saved target, cadence, and history. It does not cancel an already-running scan. Enabling a schedule still requires target/scope validation and recurring authorization.
+
 ## Terminal companion
 
 The repository includes an **early CLI launcher** at [`bin/pentelligence.mjs`](bin/pentelligence.mjs). It calls a running backend to start a scan and prints its identifier and dashboard address.

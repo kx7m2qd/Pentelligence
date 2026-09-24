@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { formatTimestamp } from '../utils/dates';
 import { apiDelete, apiGet, apiPatch, apiPost } from '../lib/api';
 import { Btn } from '../components/common/Btn';
 import { Card } from '../components/common/Card';
@@ -226,7 +227,7 @@ export default function Programs({ selectedProgram, onSelect }) {
               </label>
               {effectiveProgram.schedule && (
                 <div style={{ color: 'var(--t3)', fontFamily: 'var(--mono)', fontSize: 10 }}>
-                  Last: {effectiveProgram.schedule.last_run_at || 'never'} · Next: {effectiveProgram.schedule.next_run_at || 'not scheduled'} · Result: {effectiveProgram.schedule.last_status || 'never'}
+                  Last: {formatTimestamp(effectiveProgram.schedule.last_run_at, 'never')} · Next: {formatTimestamp(effectiveProgram.schedule.next_run_at, 'not scheduled')} · Result: {effectiveProgram.schedule.last_status || 'never'}
                 </div>
               )}
               <div style={{ display: 'flex', gap: 8 }}>

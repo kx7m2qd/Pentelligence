@@ -4,15 +4,7 @@ import { CH } from '../components/common/CH';
 import { Btn } from '../components/common/Btn';
 import { Tag } from '../components/common/Tag';
 import { apiDelete, apiGet, apiPost } from '../lib/api';
-
-function formatDate(value) {
-  if (!value) return '—';
-
-  const date = new Date(`${value.replace(' ', 'T')}Z`);
-  if (Number.isNaN(date.getTime())) return value;
-
-  return date.toLocaleString();
-}
+import { formatTimestamp } from '../utils/dates';
 
 function statusTone(status) {
   if (status === 'done') return { color: 'var(--acc)', bg: 'rgba(184,255,87,.08)' };
@@ -169,7 +161,7 @@ export default function History({ currentScanId, onOpenScan, onStartFresh }) {
                 </div>
 
                 <div style={{ gridColumn: '1 / -1', fontFamily: 'var(--mono)', fontSize: 10, color: 'var(--t3)' }}>
-                  Created: {formatDate(scan.created_at)}
+                  Created: {formatTimestamp(scan.created_at)}
                 </div>
               </div>
             );

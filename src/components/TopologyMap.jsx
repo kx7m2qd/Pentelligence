@@ -1,4 +1,5 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { prefersReducedMotion, subscribeToReducedMotion } from "../lib/motionPreference";
 import { rc } from "../utils/colors";
 import { sc } from "../utils/colors";
 
@@ -93,11 +94,13 @@ export default function TopologyMap({
   const graph = useMemo(() => buildGraph(hosts, subdomains, target), [hosts, subdomains, target]);
   const svgRef = useRef(null);
   const [view, setView] = useState({ x: 0, y: 0, k: 1 });
-  const [motionEnabled, setMotionEnabled] = useState(true);
+  const reducedMotion = useSyncExternalStore(subscribeToReducedMotion, prefersReducedMotion, () => true);
+  const [motionOverride, setMotionOverride] = useState(null);
+  const motionEnabled = motionOverride ?? !reducedMotion;
   const [hoveredNode, setHoveredNode] = useState(null);
   const dragRef = useRef(null);
   const wakeRef = useRef(null);
-  const motionRef = useRef(true);
+  const motionRef = useRef(motionEnabled);
   const [sim, setSim] = useState(null);
 
   useEffect(() => {
@@ -178,7 +181,7 @@ export default function TopologyMap({
       simRef.current = { nodes, index, links };
 
       // Sleep when the operator pauses motion and the layout has settled.
-      if (maxMotion < 0.05 && !dragRef.current && !scanning && !motionRef.current) {
+      if (maxMotion < 0.05 && !dragRef.current && !motionRef.current) {
         raf = null;
         return;
       }
@@ -338,7 +341,7 @@ export default function TopologyMap({
             strokeWidth="1.5"
             strokeDasharray="none"
           />
-          {scanning && <circle cx={CENTER_X} cy={CENTER_Y} r={40} fill="none" stroke="rgba(184,255,87,.42)" strokeWidth="1" strokeDasharray="3 6">
+          {scanning && motionEnabled && <circle cx={CENTER_X} cy={CENTER_Y} r={40} fill="none" stroke="rgba(184,255,87,.42)" strokeWidth="1" strokeDasharray="3 6">
             <animateTransform attributeName="transform" type="rotate" from={`0 ${CENTER_X} ${CENTER_Y}`} to={`360 ${CENTER_X} ${CENTER_Y}`} dur="7s" repeatCount="indefinite" />
           </circle>}
           <text x={CENTER_X} y={CENTER_Y + boundaryRadius + 14} textAnchor="middle" fontFamily="var(--mono)" fontSize="9" fill="var(--t3)" letterSpacing="2">
@@ -358,7 +361,7 @@ export default function TopologyMap({
                 strokeWidth={l.kind === "port" ? 1 : selected ? 1.6 : 1}
                 strokeDasharray={l.kind === "sub" ? "3 3" : "none"}
               >
-                {scanning && l.kind !== "port" && <animate attributeName="stroke-dashoffset" from="0" to="-12" dur="1.8s" repeatCount="indefinite" />}
+                {scanning && motionEnabled && l.kind !== "port" && <animate attributeName="stroke-dashoffset" from="0" to="-12" dur="1.8s" repeatCount="indefinite" />}
               </line>
             );
           })}
@@ -445,11 +448,12 @@ export default function TopologyMap({
         <button
           type="button"
           className={motionEnabled ? "active" : ""}
-          onClick={() => setMotionEnabled(value => !value)}
+          onClick={() => setMotionOverride(!motionEnabled)}
           aria-pressed={motionEnabled}
         >
           {motionEnabled ? "MOTION ON" : "MOTION OFF"}
         </button>
+        {motionOverride !== null && <button type="button" onClick={() => setMotionOverride(null)} title="Follow the system reduced-motion preference">USE SYSTEM</button>}
       </div>
       {hoveredNode && (
         <div className="surface-map-inspector">

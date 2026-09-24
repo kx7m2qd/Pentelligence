@@ -115,6 +115,8 @@ Open [localhost:3015](http://localhost:3015). Update `CORS_ORIGINS` to match cus
 
 ## An investigation, from start to finish
 
+The Surface map follows your system's reduced-motion preference for ambient drift and scan effects. The motion toggle overrides it for the mounted map; **Use system** restores automatic behavior. The force layout still settles when data changes or nodes are dragged.
+
 ```text
   Scope + target
        │

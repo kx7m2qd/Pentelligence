@@ -3,6 +3,7 @@ import { Card } from "../components/common/Card";
 import { CH } from "../components/common/CH";
 import { EmptyState } from "../components/common/EmptyState";
 import TopologyMap from "../components/TopologyMap";
+import EvidenceDialog from "../components/EvidenceDialog";
 import { apiGet } from "../lib/api";
 import { rc } from "../utils/colors";
 import { summarizeForHosts } from "../utils/findings.js";
@@ -279,6 +280,15 @@ export default function Recon({ scanId, focusHost, onGoLive }) {
               {screenshots.map((item, idx) => (
                 <div
                   key={item.id || idx}
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`Open screenshot for ${item.hostname}`}
+                  onKeyDown={event => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault();
+                      setLightbox(item);
+                    }
+                  }}
                   onClick={() => setLightbox(item)}
                   style={{
                     borderRadius: 8,
@@ -327,55 +337,7 @@ export default function Recon({ scanId, focusHost, onGoLive }) {
         </Card>
       )}
 
-      {lightbox && (
-        <div
-          onClick={() => setLightbox(null)}
-          style={{
-            position: "fixed",
-            inset: 0,
-            zIndex: 9999,
-            background: "rgba(0, 0, 0, 0.85)",
-            backdropFilter: "blur(6px)",
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: 24,
-          }}
-        >
-          <div
-            onClick={e => e.stopPropagation()}
-            style={{
-              maxWidth: "90vw",
-              maxHeight: "85vh",
-              background: "var(--s1)",
-              borderRadius: 12,
-              border: "1px solid var(--border2)",
-              overflow: "hidden",
-              boxShadow: "0 20px 60px rgba(0,0,0,0.7)",
-              display: "flex",
-              flexDirection: "column",
-            }}
-          >
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 18px", borderBottom: "1px solid var(--border)", background: "var(--s2)" }}>
-              <div>
-                <strong style={{ fontFamily: "var(--mono)", fontSize: 13, color: "var(--t1)" }}>{lightbox.hostname}</strong>
-                <span style={{ fontFamily: "var(--mono)", fontSize: 11, color: "var(--t3)", marginLeft: 12 }}>{lightbox.target}</span>
-              </div>
-              <button
-                type="button"
-                onClick={() => setLightbox(null)}
-                style={{ background: "none", border: 0, color: "var(--t2)", cursor: "pointer", fontSize: 18, fontFamily: "var(--mono)" }}
-              >
-                ✕
-              </button>
-            </div>
-            <div style={{ overflow: "auto", padding: 12, display: "flex", justifyContent: "center", background: "#000" }}>
-              <img src={lightbox.url} alt={lightbox.hostname} style={{ maxWidth: "100%", maxHeight: "70vh", objectFit: "contain", borderRadius: 4 }} />
-            </div>
-          </div>
-        </div>
-      )}
+      {lightbox && <EvidenceDialog item={lightbox} onClose={() => setLightbox(null)} />}
 
       {(activeTab === "all") && (hosts.length > 0 || subdomains.length > 0) && (
         <Card>

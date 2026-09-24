@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Card } from '../components/common/Card';
 import { CH } from '../components/common/CH';
 import { Btn } from '../components/common/Btn';
@@ -14,38 +14,46 @@ function statusTone(status) {
   return { color: 'var(--t3)', bg: 'var(--s2)' };
 }
 
-export default function History({ currentScanId, onOpenScan, onStartFresh }) {
+export default function History({ currentScanId, onOpenScan, onStartFresh, load = apiGet, remove = apiDelete }) {
   const [scans, setScans] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [timelineId, setTimelineId] = useState(null);
+  const [pendingDelete, setPendingDelete] = useState(null);
+  const [deleting, setDeleting] = useState(false);
 
-  const loadHistory = async () => {
+  const loadHistory = useCallback(async () => {
     setLoading(true);
     setError('');
 
     try {
-      const data = await apiGet('/recon/scans');
+      const data = await load('/recon/scans');
       setScans(data.scans || []);
     } catch (err) {
       setError(err.message);
     } finally {
       setLoading(false);
     }
-  };
+  }, [load]);
 
   useEffect(() => {
     void loadHistory();
-  }, []);
+  }, [loadHistory]);
 
   const deleteScan = async scanId => {
+    if (deleting || pendingDelete !== scanId) return;
+    setDeleting(true);
+    setError('');
     try {
-      await apiDelete(`/recon/scan/${scanId}`);
+      await remove(`/recon/scan/${scanId}`);
       setScans(current => current.filter(scan => scan.id !== scanId));
+      setPendingDelete(null);
     } catch (err) {
       setError(err.message);
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -160,8 +168,16 @@ export default function History({ currentScanId, onOpenScan, onStartFresh }) {
                   )}
                   <Btn sm onClick={() => onOpenScan(scan)}>OPEN</Btn>
                   <Btn sm aria-expanded={timelineId === scan.id} onClick={() => setTimelineId(value => value === scan.id ? null : scan.id)}>TIMELINE</Btn>
-                  <Btn sm onClick={() => deleteScan(scan.id)} disabled={scan.status === 'running'}>DELETE</Btn>
+                  <Btn sm onClick={() => setPendingDelete(scan.id)} disabled={scan.status === 'running' || deleting}>DELETE</Btn>
                 </div>
+
+                {pendingDelete === scan.id && (
+                  <div role="group" aria-label={`Confirm deletion of scan ${scan.id}`} style={{ gridColumn: '1 / -1', padding: 12, background: 'var(--s2)', borderRadius: 8 }}>
+                    <p>Delete scan #{scan.id} for {scan.target} and its stored results? This cannot be undone. Export a backup first if needed.</p>
+                    <Btn sm onClick={() => setPendingDelete(null)} disabled={deleting}>CANCEL</Btn>{' '}
+                    <Btn sm onClick={() => void deleteScan(scan.id)} disabled={deleting}>{deleting ? 'DELETING…' : 'CONFIRM DELETE'}</Btn>
+                  </div>
+                )}
 
                 <div style={{ gridColumn: '1 / -1', fontFamily: 'var(--mono)', fontSize: 10, color: 'var(--t3)' }}>
                   Created: {formatTimestamp(scan.created_at)}

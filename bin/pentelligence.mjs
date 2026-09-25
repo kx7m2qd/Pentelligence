@@ -1,18 +1,19 @@
 #!/usr/bin/env node
-const args = process.argv.slice(2);
-const command = args.shift();
-const valueFor = name => {
-  const index = args.indexOf(name);
-  return index >= 0 ? args[index + 1] : null;
-};
-
-if (command !== 'scan' || !args[0]) {
-  console.error('Usage: npm run pentelligence -- scan example.com [--base http://localhost:3001] [--program ID]');
+import { parseArguments, usage } from './arguments.mjs';
+let options;
+try {
+  options = parseArguments(process.argv.slice(2), process.env.PENTELLIGENCE_URL);
+} catch (error) {
+  console.error(error.message);
+  console.error(usage);
   process.exit(1);
 }
-
-const target = args[0];
-const base = (valueFor('--base') || process.env.PENTELLIGENCE_URL || 'http://localhost:3001').replace(/\/$/, '');
+if (options.help) {
+  console.log(usage);
+  console.log('Requires a running backend. Use only targets you are authorized to test.');
+  process.exit(0);
+}
+const { target, base, programId } = options;
 const headers = { 'content-type': 'application/json' };
 if (process.env.PENTELLIGENCE_ACCESS_TOKEN) headers['x-access-token'] = process.env.PENTELLIGENCE_ACCESS_TOKEN;
 
@@ -22,7 +23,7 @@ const sessionData = await session.json();
 headers['x-workspace-token'] = sessionData.workspaceToken;
 const response = await fetch(`${base}/api/recon/start`, {
   method: 'POST', headers,
-  body: JSON.stringify({ target, programId: valueFor('--program') ? Number(valueFor('--program')) : undefined, authorizationConfirmed: true, authorizationNote: 'CLI authorized scan' }),
+  body: JSON.stringify({ target, programId, authorizationConfirmed: true, authorizationNote: 'CLI authorized scan' }),
 });
 const payload = await response.json();
 if (!response.ok) throw new Error(payload.error || `scan failed: ${response.status}`);

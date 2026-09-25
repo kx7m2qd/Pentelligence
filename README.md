@@ -158,12 +158,12 @@ Pausing prevents future scheduled runs without revalidating DNS or scope and pre
 The repository includes an **early CLI launcher** at [`bin/pentelligence.mjs`](bin/pentelligence.mjs). It calls a running backend to start a scan and prints its identifier and dashboard address.
 
 ```bash
-# Show the current usage syntax (exits with status 1)
-npm run pentelligence --
+# Show usage without contacting the backend (exit status 0)
+npm run pentelligence -- --help
 ```
 
 ```text
-Usage: npm run pentelligence -- scan example.com [--base http://localhost:3001] [--program ID]
+Usage: npm run pentelligence -- scan TARGET [--base http://localhost:3001] [--program ID]
 ```
 
 The launcher supports `PENTELLIGENCE_URL` and `PENTELLIGENCE_ACCESS_TOKEN`. It creates a workspace session and submits authorization confirmation on invocation; use it only for explicitly authorized targets. Program IDs must belong to the resulting workspace. Browser session sharing, interactive authentication, live terminal progress, and a full terminal UI are not implemented by this launcher. The browser is currently the primary workflow.

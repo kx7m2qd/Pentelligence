@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState, useSyncExternalStore } fro
 import { prefersReducedMotion, subscribeToReducedMotion } from "../lib/motionPreference";
 import { rc } from "../utils/colors";
 import { sc } from "../utils/colors";
+import { screenToSvg } from "../utils/mapCoordinates";
 
 // Shared map geometry: the simulation seeds, gravity, boundary circle and the
 // "TARGET · ENVIRONMENT" label all derive from these so they can't drift.
@@ -220,17 +221,19 @@ export default function TopologyMap({
   }, [centerOnIndex]);
 
   const toSvg = (clientX, clientY) => {
-    const rect = svgRef.current?.getBoundingClientRect();
-    if (!rect) return { x: 0, y: 0 };
+    const point = screenToSvg(svgRef.current, clientX, clientY);
+    if (!point) return null;
     return {
-      x: (clientX - rect.left - view.x) / view.k,
-      y: (clientY - rect.top - view.y) / view.k,
+      x: (point.x - view.x) / view.k,
+      y: (point.y - view.y) / view.k,
     };
   };
 
   const startNodeDrag = (event, node) => {
     event.stopPropagation();
     const p = toSvg(event.clientX, event.clientY);
+    if (!p) return;
+    svgRef.current.setPointerCapture(event.pointerId);
     dragRef.current = { id: node.id, dx: node.x - p.x, dy: node.y - p.y, moved: false, node };
     if (node.kind === "host" && onSelectHost) onSelectHost(node.hostIndex);
     wakeRef.current?.();
@@ -240,10 +243,13 @@ export default function TopologyMap({
     if (!dragRef.current) return;
     const drag = dragRef.current;
     if (drag.pan) {
-      setView(v => ({ ...v, x: drag.vx + (event.clientX - drag.startX), y: drag.vy + (event.clientY - drag.startY) }));
+      const point = screenToSvg(svgRef.current, event.clientX, event.clientY);
+      if (!point) return;
+      setView(v => ({ ...v, x: drag.vx + point.x - drag.startX, y: drag.vy + point.y - drag.startY }));
       return;
     }
     const p = toSvg(event.clientX, event.clientY);
+    if (!p) return;
     const node = nodeById.get(drag.id);
     if (node) { node.x = p.x + drag.dx; node.y = p.y + drag.dy; }
     drag.moved = true;
@@ -252,7 +258,10 @@ export default function TopologyMap({
   const endDrag = () => { dragRef.current = null; };
 
   const startPan = event => {
-    dragRef.current = { pan: true, startX: event.clientX, startY: event.clientY, vx: view.x, vy: view.y };
+    const point = screenToSvg(svgRef.current, event.clientX, event.clientY);
+    if (!point) return;
+    svgRef.current.setPointerCapture(event.pointerId);
+    dragRef.current = { pan: true, startX: point.x, startY: point.y, vx: view.x, vy: view.y };
   };
 
   const zoomBy = factor => {
@@ -277,9 +286,9 @@ export default function TopologyMap({
 
     const onWheel = event => {
       event.preventDefault();
-      const rect = svg.getBoundingClientRect();
-      const px = event.clientX - rect.left;
-      const py = event.clientY - rect.top;
+      const point = screenToSvg(svg, event.clientX, event.clientY);
+      if (!point) return;
+      const { x: px, y: py } = point;
       setView(v => {
         const factor = event.deltaY < 0 ? 1.12 : 0.9;
         const k = Math.min(Math.max(v.k * factor, 0.4), 3);
@@ -320,7 +329,8 @@ export default function TopologyMap({
         onPointerDown={startPan}
         onPointerMove={onPointerMove}
         onPointerUp={endDrag}
-        onPointerLeave={endDrag}
+        onPointerCancel={endDrag}
+        onLostPointerCapture={endDrag}
       >
         <defs>
           <pattern id="surface-grid" width="24" height="24" patternUnits="userSpaceOnUse">

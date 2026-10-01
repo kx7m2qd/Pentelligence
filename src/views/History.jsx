@@ -5,6 +5,7 @@ import { Btn } from '../components/common/Btn';
 import { Tag } from '../components/common/Tag';
 import { apiDelete, apiGet, apiPost } from '../lib/api';
 import { formatTimestamp } from '../utils/dates';
+import ScanTimeline from '../components/ScanTimeline';
 
 function statusTone(status) {
   if (status === 'done') return { color: 'var(--acc)', bg: 'rgba(184,255,87,.08)' };
@@ -19,6 +20,7 @@ export default function History({ currentScanId, onOpenScan, onStartFresh }) {
   const [error, setError] = useState('');
   const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [timelineId, setTimelineId] = useState(null);
 
   const loadHistory = async () => {
     setLoading(true);
@@ -157,12 +159,14 @@ export default function History({ currentScanId, onOpenScan, onStartFresh }) {
                     <Btn sm accent onClick={() => retryScan(scan)}>RETRY</Btn>
                   )}
                   <Btn sm onClick={() => onOpenScan(scan)}>OPEN</Btn>
+                  <Btn sm aria-expanded={timelineId === scan.id} onClick={() => setTimelineId(value => value === scan.id ? null : scan.id)}>TIMELINE</Btn>
                   <Btn sm onClick={() => deleteScan(scan.id)} disabled={scan.status === 'running'}>DELETE</Btn>
                 </div>
 
                 <div style={{ gridColumn: '1 / -1', fontFamily: 'var(--mono)', fontSize: 10, color: 'var(--t3)' }}>
                   Created: {formatTimestamp(scan.created_at)}
                 </div>
+                {timelineId === scan.id && <ScanTimeline key={scan.id} scanId={scan.id} />}
               </div>
             );
           })

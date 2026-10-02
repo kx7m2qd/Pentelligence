@@ -1,5 +1,6 @@
 import React from 'react';
 import { NAV, NAV_GROUPS } from '../../data/constants';
+import { Icon } from '../common/Icon';
 
 export const Sidebar = ({ active, setActive, collapsed, setCollapsed, mobileOpen, setMobileOpen }) => {
   return (
@@ -27,7 +28,7 @@ export const Sidebar = ({ active, setActive, collapsed, setCollapsed, mobileOpen
                   aria-current={active === item.id ? 'page' : undefined}
                   className={`nav-item ${active === item.id ? 'active' : ''}`}
                 >
-                  <span className="nav-icon">{item.icon}</span>
+                  <span className="nav-icon"><Icon name={item.icon} size={16} /></span>
                   {!collapsed && <span className="nav-label">{item.label}</span>}
                 </button>
               ))}
@@ -36,7 +37,7 @@ export const Sidebar = ({ active, setActive, collapsed, setCollapsed, mobileOpen
         })}
       </nav>
       <button type="button" className="sidebar-collapse" onClick={() => setCollapsed(value => !value)}>
-        <span style={{ transform: collapsed ? 'rotate(180deg)' : 'none', display: 'inline-block', transition: 'transform .22s' }}>◀</span>
+        <span style={{ transform: collapsed ? 'rotate(180deg)' : 'none', display: 'inline-flex', transition: 'transform .22s' }}><Icon name="chevron-left" size={13} /></span>
         {!collapsed && <span>Collapse</span>}
       </button>
       </aside>

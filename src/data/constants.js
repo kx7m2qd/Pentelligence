@@ -19,15 +19,15 @@ export const TEMPLATE_FOCUS = {
 };
 
 export const NAV = [
-  { id: 'dashboard', icon: '⬡', label: 'Live', group: 'investigation' },
-  { id: 'recon', icon: '◎', label: 'Surface', group: 'investigation' },
-  { id: 'findings', icon: '▣', label: 'Findings', group: 'investigation' },
-  { id: 'changes', icon: '⇄', label: 'Changes', group: 'investigation' },
-  { id: 'report', icon: '▤', label: 'Report', group: 'investigation' },
-  { id: 'programs', icon: '☰', label: 'Programs', group: 'workspace' },
-  { id: 'history', icon: '◷', label: 'History', group: 'workspace' },
-  { id: 'scan', icon: '⊞', label: 'Nuclei', group: 'advanced' },
-  { id: 'exploit', icon: '⚡', label: 'Active checks', group: 'advanced' },
+  { id: 'dashboard', icon: 'activity', label: 'Live', group: 'investigation' },
+  { id: 'recon', icon: 'radar', label: 'Surface', group: 'investigation' },
+  { id: 'findings', icon: 'inbox', label: 'Findings', group: 'investigation' },
+  { id: 'changes', icon: 'git-compare', label: 'Changes', group: 'investigation' },
+  { id: 'report', icon: 'file-text', label: 'Report', group: 'investigation' },
+  { id: 'programs', icon: 'target', label: 'Programs', group: 'workspace' },
+  { id: 'history', icon: 'history', label: 'History', group: 'workspace' },
+  { id: 'scan', icon: 'scan', label: 'Nuclei', group: 'advanced' },
+  { id: 'exploit', icon: 'zap', label: 'Active checks', group: 'advanced' },
 ];
 
 export const NAV_GROUPS = [

@@ -18,6 +18,26 @@ import { runWebProbe } from '../modules/webProbe.js';
 import { captureScreenshots } from '../modules/screenshots.js';
 import { notifyScanEvent } from '../notifications.js';
 import { compareFindings } from '../fingerprints.js';
+import { getToolReadiness } from '../tools.js';
+
+// CLI binaries the recon pipeline shells out to. The AI provider is handled
+// separately (the agent phase is already guarded by config).
+const PIPELINE_CLI_TOOLS = ['subfinder', 'nmap', 'nuclei'];
+
+// Returns a human-readable error if any required scanner binary is missing,
+// so a scan fails fast with install guidance instead of a raw ENOENT crash.
+async function missingToolsMessage() {
+  const readiness = await getToolReadiness();
+  const missing = readiness.tools.filter(
+    tool => PIPELINE_CLI_TOOLS.includes(tool.id) && !tool.installed,
+  );
+  if (missing.length === 0) return null;
+  const names = missing.map(tool => tool.label).join(', ');
+  const brewPkgs = missing.map(tool => tool.command).join(' ');
+  return `Required scanning tools not installed: ${names}. ` +
+    `Install them locally with "brew install ${brewPkgs}", ` +
+    `or run the bundled stack with "docker compose up --build" (all tools preinstalled).`;
+}
 
 const router = express.Router();
 
@@ -103,6 +123,14 @@ export async function runReconPipeline(scanId, target, scopeRules = null, exclud
         throw error;
       }
     };
+
+    const toolsError = await missingToolsMessage();
+    if (toolsError) {
+      setScanState(scanId, { status: 'error', phase: 'error', message: 'Missing required tools', error_message: toolsError });
+      void notifyScanEvent({ target, message: `scan blocked: ${toolsError}` });
+      return;
+    }
+
     setScanState(scanId, { status: 'running', phase: 'subfinder', message: 'Enumerating subdomains', error_message: '' });
     const discoveredSubdomains = await runSubfinder(target, scanId);
     checkCancellation();

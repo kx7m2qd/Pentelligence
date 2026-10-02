@@ -1,5 +1,6 @@
 import React from 'react';
 import { Btn } from '../common/Btn';
+import { Icon } from '../common/Icon';
 import { PAGE_LABELS } from '../../data/constants';
 
 function formatElapsed(seconds) {
@@ -33,7 +34,7 @@ export const Header = ({
   return (
     <header className="app-header">
       <div className="header-leading">
-        <button type="button" className="mobile-nav-toggle" aria-label={mobileNavOpen ? 'Close navigation' : 'Open navigation'} aria-expanded={mobileNavOpen} onClick={onToggleNav}>☰</button>
+        <button type="button" className="mobile-nav-toggle" aria-label={mobileNavOpen ? 'Close navigation' : 'Open navigation'} aria-expanded={mobileNavOpen} onClick={onToggleNav}><Icon name="menu" size={16} /></button>
         <div className="header-page">{PAGE_LABELS[active]}</div>
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>

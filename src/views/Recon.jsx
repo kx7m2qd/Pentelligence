@@ -4,7 +4,7 @@ import { CH } from "../components/common/CH";
 import { EmptyState } from "../components/common/EmptyState";
 import TopologyMap from "../components/TopologyMap";
 import EvidenceDialog from "../components/EvidenceDialog";
-import { apiGet } from "../lib/api";
+import { apiGet, apiStream } from "../lib/api";
 import { rc } from "../utils/colors";
 import { summarizeForHosts } from "../utils/findings.js";
 
@@ -146,13 +146,12 @@ export default function Recon({ scanId, focusHost, onGoLive }) {
       setElapsed(value => value + 1);
     }, 1000);
 
-    void poll();
-    const intervalId = setInterval(() => {
-      void poll();
-    }, 2000);
+    const controller = new AbortController();
+    void apiStream(`/recon/events/${scanId}`, event => { if (event.event === 'scan') void poll(); }, controller.signal)
+      .catch(err => { if (!controller.signal.aborted) setError(err.message); });
 
     return () => {
-      clearInterval(intervalId);
+      controller.abort();
       clearInterval(timerRef.current);
     };
   }, [scanId]);

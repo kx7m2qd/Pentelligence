@@ -4,7 +4,7 @@ import { CH } from '../components/common/CH';
 import { Tag } from '../components/common/Tag';
 import { Btn } from '../components/common/Btn';
 import { EmptyState } from '../components/common/EmptyState';
-import { apiGet } from '../lib/api';
+import { apiGet, apiDownload } from '../lib/api';
 import { sc, sb } from '../utils/colors';
 
 // The report view shows exactly what is stored for this investigation and
@@ -242,7 +242,7 @@ export default function Report({ scanId, onGoLive }) {
         setReport(data.report || null);
         setMeta(data.meta || null);
         setComparison(compareData?.comparison || null);
-        setNucleiFindings(nucleiData?.findings || []);
+        setNucleiFindings((nucleiData?.findings || []).filter(finding => finding.confidence === 'confirmed'));
         if (toolData?.tools) {
           setTools(Object.entries(toolData.tools)
             .map(([name, info]) => `${name} ${info.version || ''}`.trim())
@@ -418,6 +418,8 @@ export default function Report({ scanId, onGoLive }) {
                 <Btn onClick={exportHtml} disabled={!meta}>HTML REPORT</Btn>
                 <Btn onClick={exportPdf} disabled={!meta}>PRINT / PDF</Btn>
                 <Btn onClick={exportJson} disabled={!meta}>JSON DATA</Btn>
+                <Btn onClick={() => apiDownload(`/exports/${scanId}/sarif`, `scan-${scanId}.sarif`).catch(err => window.alert(err.message))} disabled={!meta}>SARIF</Btn>
+                <Btn onClick={() => apiDownload(`/exports/${scanId}/pdf`, `scan-${scanId}.pdf`).catch(err => window.alert(err.message))} disabled={!meta}>DOWNLOAD PDF</Btn>
               </div>
             </div>
           </Card>

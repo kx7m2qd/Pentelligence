@@ -1,10 +1,11 @@
+import { logger } from "../logger.js";
 import db from "../db.js";
 import { analyseHost, decideNextAction } from "./groq.js";
 import { config } from "../config.js";
 
 export async function runAgentLoop(scanId, emitLog) {
   const log = msg => {
-    console.log(`[agent] ${msg}`);
+    logger.info(`[agent] ${msg}`);
     if (emitLog) emitLog(msg);
   };
 

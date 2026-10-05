@@ -4,13 +4,13 @@ import { CH } from '../components/common/CH';
 import { Tag } from '../components/common/Tag';
 import { Btn } from '../components/common/Btn';
 import { EmptyState } from '../components/common/EmptyState';
-import { apiGet, apiPatch } from '../lib/api';
+import { apiGet, apiPatch, apiStream } from '../lib/api';
 import { sc, sb } from '../utils/colors';
 import { buildFindingMarkdown } from '../utils/findings.js';
 
-function sourceMeta(source) {
-  if (source === 'nuclei') return { label: 'NUCLEI CONFIRMED', color: 'var(--acc)', bg: 'rgba(184,255,87,.1)' };
-  return { label: 'AI SUGGESTED', color: 'var(--yellow)', bg: 'rgba(255,209,102,.1)' };
+function sourceMeta(finding) {
+  if (finding.confidence === 'confirmed') return { label: 'CONFIRMED', color: 'var(--acc)', bg: 'rgba(184,255,87,.1)' };
+  return { label: (finding.confidence || 'unconfirmed').toUpperCase(), color: 'var(--yellow)', bg: 'rgba(255,209,102,.1)' };
 }
 
 export default function Findings({ scanId, onGoLive, onOpenHost }) {
@@ -65,9 +65,10 @@ export default function Findings({ scanId, onGoLive, onOpenHost }) {
       }
     };
 
-    void poll();
-    const intervalId = setInterval(() => void poll(), 3000);
-    return () => clearInterval(intervalId);
+    const controller = new AbortController();
+    void apiStream(`/recon/events/${scanId}`, event => { if (event.event === 'scan') void poll(); }, controller.signal)
+      .catch(err => { if (!controller.signal.aborted) setError(err.message); });
+    return () => controller.abort();
   }, [scanId]);
 
   const severityCounts = useMemo(() => findings.reduce((counts, finding) => {
@@ -142,6 +143,16 @@ export default function Findings({ scanId, onGoLive, onOpenHost }) {
     }
   };
 
+  const changeConfidence = async confidence => {
+    if (!selected) return;
+    try {
+      await apiPatch(`/findings/confidence/${scanId}/${selected.source}/${selected.id}`, { confidence, authorizationNote: reviewDraft.analystNote });
+      setSelected({ ...selected, confidence });
+      setFindings(current => current.map(item => item.source === selected.source && item.id === selected.id ? { ...item, confidence } : item));
+      setError('');
+    } catch (err) { setError(err.message); }
+  };
+
   if (!scanId) {
     return (
       <div className="page">
@@ -164,7 +175,7 @@ export default function Findings({ scanId, onGoLive, onOpenHost }) {
           ['open', 'Open'],
           ['in_progress', 'In Progress'],
           ['resolved', 'Resolved'],
-          ['nuclei', 'Nuclei confirmed'],
+          ['nuclei', 'Nuclei matches'],
           ['agent', 'AI suggested'],
           ['critical', 'Critical'],
         ].map(([id, label]) => (
@@ -180,7 +191,7 @@ export default function Findings({ scanId, onGoLive, onOpenHost }) {
           {visible.length === 0 ? (
             <div className="program-empty">No findings in this filter yet.</div>
           ) : visible.map(finding => {
-            const meta = sourceMeta(finding.source);
+            const meta = sourceMeta(finding);
             const active = selected && selected.id === finding.id && selected.source === finding.source;
             const review = reviews[`${finding.source}:${finding.id}`] || {};
             const isResolved = review.status === 'resolved';
@@ -222,7 +233,7 @@ export default function Findings({ scanId, onGoLive, onOpenHost }) {
           })}
         </Card>
         <Card>
-          <CH left="DETAIL & REMEDIATION" right={selected ? sourceMeta(selected.source).label : 'select a finding'} />
+          <CH left="DETAIL & REMEDIATION" right={selected ? sourceMeta(selected).label : 'select a finding'} />
           {!selected ? (
             <div className="program-empty">Select a finding to inspect evidence and set remediation details.</div>
           ) : (
@@ -267,6 +278,13 @@ export default function Findings({ scanId, onGoLive, onOpenHost }) {
 
               <div style={{ padding: '14px', borderRadius: 8, background: 'var(--s2)', border: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: 12 }}>
                 <div className="eyebrow">REMEDIATION & ASSIGNMENT</div>
+                <label>Evidence confidence (describe verification in analyst notes first)
+                  <select aria-label="Finding confidence" value={selected.confidence || 'unconfirmed'} onChange={event => void changeConfidence(event.target.value)}>
+                    <option value="suggested">Suggested</option>
+                    <option value="unconfirmed">Unconfirmed</option>
+                    <option value="confirmed">Confirmed</option>
+                  </select>
+                </label>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                   <div>
                     <label style={{ display: 'block', marginBottom: 4, fontFamily: 'var(--mono)', fontSize: 10, color: 'var(--t3)' }}>STATUS</label>

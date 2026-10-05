@@ -7,18 +7,18 @@ export function createWorkspace(accessSessionId = null) {
   return { id: Number(result.lastInsertRowid), token };
 }
 
-export function createAccessSession(ttlHours) {
+export function createAccessSession(ttlHours, role = 'admin') {
   const token = crypto.randomBytes(32).toString('base64url');
   const result = db.prepare(`
-    INSERT INTO access_sessions (token, expires_at)
-    VALUES (?, datetime('now', ?))
-  `).run(token, `+${ttlHours} hours`);
+    INSERT INTO access_sessions (token, expires_at, role)
+    VALUES (?, datetime('now', ?), ?)
+  `).run(token, `+${ttlHours} hours`, role);
   return { id: Number(result.lastInsertRowid), token };
 }
 
 export function getAccessSession(token) {
   return db.prepare(`
-    SELECT id, expires_at FROM access_sessions
+    SELECT id, expires_at, role FROM access_sessions
     WHERE token = ? AND expires_at > CURRENT_TIMESTAMP
   `).get(token);
 }
@@ -36,6 +36,7 @@ export function requireAccessSession(req, res, next) {
   const session = token ? getAccessSession(token) : null;
   if (!session) return res.status(401).json({ error: 'sign in is required' });
   req.accessSessionId = session.id;
+  req.role = session.role;
   next();
 }
 

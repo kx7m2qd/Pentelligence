@@ -1,3 +1,4 @@
+import { logger } from "./logger.js";
 import db from './db.js';
 import { compareFindings } from './fingerprints.js';
 import { notifyScanEvent } from './notifications.js';
@@ -44,7 +45,7 @@ async function executeSchedule(schedule) {
   } catch (error) {
     db.prepare(`UPDATE program_schedules SET last_status = 'error', updated_at = CURRENT_TIMESTAMP WHERE id = ?`).run(schedule.id);
     await notifyScanEvent({ target: schedule.target, message: `scheduled monitoring failed: ${error.message}` });
-    console.warn(`[scheduler] ${schedule.target}: ${error.message}`);
+    logger.warn(`[scheduler] ${schedule.target}: ${error.message}`);
   } finally {
     activeSchedules.delete(schedule.id);
   }

@@ -32,3 +32,14 @@ test('allows explicit private resolution checks only when enabled', async () => 
   await assertPublicResolution('127.0.0.1', { allowPrivateTargets: true });
   await assert.rejects(() => assertPublicResolution('localhost'), /private or local|does not resolve/);
 });
+
+test('DNS is checked on every execution and rejects a public-to-private change', async () => {
+  let address = '8.8.8.8';
+  const lookup = async () => [{ address, family: 4 }];
+  await assertPublicResolution('example.com', { lookup });
+  address = '127.0.0.1';
+  await assert.rejects(assertPublicResolution('example.com', { lookup }), /private/);
+  await assert.rejects(assertPublicResolution('192.168.1.1'), /private/);
+  assert.throws(() => normalizeTargetInput('8.8.8.8/0'), /policy/);
+  assert.throws(() => normalizeTargetInput('8.8.8.8/24junk', { allowPrivateTargets: true }), /CIDR/);
+});

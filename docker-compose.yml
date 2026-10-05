@@ -5,8 +5,8 @@ services:
       args:
         GO_VERSION: ${GO_VERSION:-1.25-bookworm}
         NODE_VERSION: ${NODE_VERSION:-24-bookworm-slim}
-        NUCLEI_VERSION: ${NUCLEI_VERSION:-latest}
-        SUBFINDER_VERSION: ${SUBFINDER_VERSION:-latest}
+        NUCLEI_VERSION: ${NUCLEI_VERSION:-v3.8.0}
+        SUBFINDER_VERSION: ${SUBFINDER_VERSION:-v2.14.0}
     image: pentelligence:local
     container_name: pentelligence
     restart: unless-stopped

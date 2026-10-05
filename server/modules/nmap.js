@@ -1,6 +1,9 @@
+import { logger } from "../logger.js";
 import { execa } from 'execa';
-import { parseStringPromise } from 'xml2js';
+import { parseNmapXml } from '../parsers.js';
 import db from '../db.js';
+import { assertScanTarget } from '../scanGuard.js';
+import { isIP } from 'node:net';
 
 const BREW_PATH = '/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin';
 const NMAP_BINARY = process.env.NMAP_PATH || 'nmap';
@@ -47,14 +50,20 @@ const PORT_PROFILE_ARGS = {
 async function runNmap(targets, scanId, portProfile = 'standard') {
   const targetList = [...new Set((Array.isArray(targets) ? targets : [targets]).filter(Boolean))];
   const selectedProfile = PORT_PROFILE_ARGS[portProfile] ? portProfile : 'standard';
+  const pinned = new Map();
+  for (const target of targetList) {
+    for (const address of await assertScanTarget(scanId, target)) if (isIP(address) !== 6 && !pinned.has(address)) pinned.set(address, target);
+  }
+  if (!pinned.size) throw new Error('No approved IPv4 targets available for this nmap profile');
   const isFullScan = selectedProfile === 'full';
-  console.log(`[nmap] starting ${selectedProfile} scan on ${targetList.length} target(s)`);
+  logger.info(`[nmap] starting ${selectedProfile} scan on ${targetList.length} target(s)`);
 
   let xmlOutput = '';
 
   try {
     const { stdout } = await execa(NMAP_BINARY, [
       '-Pn',
+      '-n',
       '-sT',
       '-sV',
       '--version-light',
@@ -62,7 +71,7 @@ async function runNmap(targets, scanId, portProfile = 'standard') {
       '--open',
       '--host-timeout', isFullScan ? '10m' : '45s',
       '-oX', '-',
-      ...targetList,
+      ...pinned.keys(),
     ], {
       env: { ...process.env, PATH: BREW_PATH },
       timeout: isFullScan
@@ -75,7 +84,7 @@ async function runNmap(targets, scanId, portProfile = 'standard') {
     if (err.stdout && String(err.stdout).includes('</nmaprun>')) {
       xmlOutput = err.stdout;
     } else {
-      console.error(`[nmap] FAILED to run real scan: ${err.code || err.message}`);
+      logger.error(`[nmap] FAILED to run real scan: ${err.code || err.message}`);
       if (err.timedOut) {
         throw new Error('nmap scan timed out before producing complete output');
       }
@@ -87,48 +96,21 @@ async function runNmap(targets, scanId, portProfile = 'standard') {
     return [];
   }
 
-  const parsed = await parseStringPromise(xmlOutput, { explicitArray: false });
-  const rawHosts = parsed?.nmaprun?.host
-    ? Array.isArray(parsed.nmaprun.host) ? parsed.nmaprun.host : [parsed.nmaprun.host]
-    : [];
+  const rawHosts = await parseNmapXml(xmlOutput);
 
   const results = [];
 
   for (const host of rawHosts) {
-    if (host.status?.$?.state !== 'up') continue;
-
-    const addresses = Array.isArray(host.address) ? host.address : [host.address];
-    const ipAddress = addresses.find(item => item?.$?.addrtype === 'ipv4')?.$?.addr || '';
-    const hostnameRaw = host.hostnames?.hostname;
-    const hostname = hostnameRaw
-      ? (Array.isArray(hostnameRaw) ? hostnameRaw[0]?.$?.name : hostnameRaw?.$?.name) || ipAddress
-      : ipAddress;
-    const osMatch = host.os?.osmatch;
-    const osName = osMatch
-      ? (Array.isArray(osMatch) ? osMatch[0]?.$?.name : osMatch?.$?.name) || 'Unknown'
-      : 'Unknown';
-    const portList = host.ports?.port
-      ? Array.isArray(host.ports.port) ? host.ports.port : [host.ports.port]
-      : [];
-
-    const hostId = upsertHost(scanId, ipAddress, hostname, osName);
-    const ports = [];
-
-    for (const port of portList) {
-      const portNum = Number.parseInt(port?.$?.portid || '0', 10);
-      const protocol = port?.$?.protocol || 'tcp';
-      const state = port?.state?.$?.state || 'unknown';
-      const service = port?.service?.$?.name || '';
-      const version = port?.service?.$?.version || '';
-
-      upsertPort(hostId, portNum, protocol, service, version, state);
-      ports.push({ port: portNum, protocol, service, version, state });
+    const original = pinned.get(host.ip);
+    if (original && !original.includes('/')) host.hostname = original;
+    const hostId = upsertHost(scanId, host.ip, host.hostname, host.os);
+    for (const port of host.ports) {
+      upsertPort(hostId, port.port, port.protocol, port.service, port.version, port.state);
     }
-
-    results.push({ ip: ipAddress, hostname, os: osName, status: 'up', ports, hostId });
+    results.push({ ...host, hostId });
   }
 
-  console.log(`[nmap] found ${results.length} live hosts`);
+  logger.info(`[nmap] found ${results.length} live hosts`);
   return results;
 }
 

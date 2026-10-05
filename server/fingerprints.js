@@ -7,13 +7,14 @@ export function findingFingerprint(finding) {
   ].map(value => String(value).trim().toLowerCase()).join('|');
 }
 
-export function compareFindings(previous, current) {
+export function compareFindings(previous, current, historical = []) {
+  const seen = new Set(historical.map(findingFingerprint));
   const oldMap = new Map(previous.map(finding => [findingFingerprint(finding), finding]));
   const newMap = new Map(current.map(finding => [findingFingerprint(finding), finding]));
   const result = { new: [], fixed: [], unchanged: [], regressed: [] };
   for (const [fingerprint, finding] of newMap) {
     const oldFinding = oldMap.get(fingerprint);
-    if (!oldFinding) result.new.push(finding);
+    if (!oldFinding) (seen.has(fingerprint) ? result.regressed : result.new).push(finding);
     else if (Number(finding.score || finding.cvss_score || 0) > Number(oldFinding.score || oldFinding.cvss_score || 0)) result.regressed.push(finding);
     else result.unchanged.push(finding);
   }

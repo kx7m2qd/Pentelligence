@@ -1,7 +1,8 @@
+import { logger } from "./logger.js";
 import { config } from './config.js';
 
 export async function notifyScanEvent(event, {
-  webhookUrl = config.discordWebhookUrl, send = fetch, warn = console.warn,
+  webhookUrl = config.discordWebhookUrl, send = fetch, warn = message => logger.warn(message),
 } = {}) {
   if (!webhookUrl) return false;
   const text = `[Pentelligence] ${event.target}: ${event.message}`;

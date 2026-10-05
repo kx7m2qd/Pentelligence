@@ -1,10 +1,10 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Card } from '../components/common/Card';
 import { CH } from '../components/common/CH';
 import { Tag } from '../components/common/Tag';
 import { Btn } from '../components/common/Btn';
 import { EmptyState } from '../components/common/EmptyState';
-import { apiGet, apiPost } from '../lib/api';
+import { apiGet, apiPost, apiStream } from '../lib/api';
 import { sc, sb } from '../utils/colors';
 
 // Advanced / Nuclei rerun. Deliberately minimal: this view does not pretend
@@ -17,10 +17,11 @@ export default function Scan({ scanId, intensity, onGoLive }) {
   const [running, setRunning] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
-  const pollRef = useRef(null);
+  const [revision, setRevision] = useState(0);
 
   useEffect(() => {
     if (!scanId) return undefined;
+    const controller = new AbortController();
 
     const poll = async () => {
       try {
@@ -28,18 +29,20 @@ export default function Scan({ scanId, intensity, onGoLive }) {
           apiGet(`/nuclei/findings/${scanId}`),
           apiGet(`/nuclei/status/${scanId}`).catch(() => null),
         ]);
+        if (controller.signal.aborted) return;
         setFindings(nucleiData.findings || []);
         setStatus(statusData);
         setError('');
       } catch (err) {
-        setError(err.message);
+        if (!controller.signal.aborted) setError(err.message);
       }
     };
 
-    void poll();
-    pollRef.current = setInterval(() => void poll(), 3000);
-    return () => clearInterval(pollRef.current);
-  }, [scanId]);
+    void apiStream(`/recon/events/${scanId}`, event => {
+      if (event.event === 'scan') void poll();
+    }, controller.signal).catch(err => { if (!controller.signal.aborted) setError(err.message); });
+    return () => controller.abort();
+  }, [scanId, revision]);
 
   const rerun = async () => {
     setRunning(true);
@@ -47,6 +50,7 @@ export default function Scan({ scanId, intensity, onGoLive }) {
     setError('');
     try {
       await apiPost(`/nuclei/run/${scanId}`, {});
+      setRevision(value => value + 1);
       setNotice('Nuclei rerun started — matching templates run against every live host from this scan.');
     } catch (err) {
       setError(err.message);
@@ -63,7 +67,7 @@ export default function Scan({ scanId, intensity, onGoLive }) {
     );
   }
 
-  const counts = findings.reduce((acc, f) => {
+  const counts = findings.filter(finding => finding.confidence === 'confirmed').reduce((acc, f) => {
     const key = String(f.severity || 'unknown').toUpperCase();
     acc[key] = (acc[key] || 0) + 1;
     return acc;
@@ -75,7 +79,7 @@ export default function Scan({ scanId, intensity, onGoLive }) {
       {notice && <div className="app-banner" style={{ border: '1px solid rgba(184,255,87,.3)', background: 'rgba(184,255,87,.06)', color: 'var(--acc)' }}>{notice}</div>}
 
       <Card>
-        <CH left="NUCLEI — CONFIRMED TEMPLATE MATCHES" right={status?.phase === 'nuclei' && status?.status === 'running' ? 'running…' : `${findings.length} confirmed`} />
+        <CH left="NUCLEI — TEMPLATE MATCHES" right={status?.phase === 'nuclei' && status?.status === 'running' ? 'running…' : `${findings.filter(f => f.confidence === 'confirmed').length} confirmed / ${findings.length} total`} />
         <div style={{ padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: 12 }}>
           <p className="empty-copy" style={{ margin: 0 }}>
             These are template matches nuclei verified against your hosts — not AI guesses.

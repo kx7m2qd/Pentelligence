@@ -3,6 +3,7 @@ import db from "../db.js";
 import { runNucleiOnScan } from "../modules/nuclei.js";
 import { isScanTaskActive } from "../scanState.js";
 import { ownedScan } from "../workspaces.js";
+import { auditTaskAdmission } from '../security.js';
 
 const router = express.Router();
 
@@ -28,6 +29,7 @@ router.post("/run/:scanId", async (req, res) => {
   const scan   = ownedScan(req.workspaceId, scanId);
   if (!scan) return res.status(404).json({ error: "scan not found" });
   if (isScanTaskActive(scanId, "nuclei")) return res.status(409).json({ error: "nuclei scan already running" });
+  auditTaskAdmission(req, scan, 'nuclei');
 
   setScanState(scanId, {
     status: "running",
@@ -43,6 +45,9 @@ router.post("/run/:scanId", async (req, res) => {
   void runNucleiOnScan(scanId, msg => {
     db.prepare("INSERT INTO agent_logs (scan_id, type, content) VALUES (?, ?, ?)")
       .run(scanId, "nuclei-log", msg);
+  }).catch(() => {
+    setScanState(scanId, { status: 'error', phase: 'error', message: 'Nuclei task failed' });
+    req.log?.error({ scanId }, 'nuclei task failed');
   }).finally(() => {
     const latestScan = db.prepare("SELECT status, phase FROM scans WHERE id = ?").get(scanId);
     if (latestScan?.phase === "nuclei") {

@@ -39,6 +39,8 @@ These changes are local until reviewed and published. Existing installations mig
 
 ## Verification limits and external actions
 
+The 2026-10-05 CI audit identified a vulnerable transitive dependency in Nodemon. Development now uses Node 24's native `--watch` mode instead. A clean `npm ci`, fresh audit (zero vulnerabilities), lint, coverage tests and production build all passed after removing that dependency chain.
+
 Local verification on 2026-10-05 passed: ESLint, all 52 tests with coverage gates, and the Vite production build. Measured coverage across loaded non-test code: 50.42% lines, 70.80% branches, 56.30% functions. The dependency audit reported zero vulnerabilities after compatible updates on 2026-10-02. A mocked browser fixture verified the confidence-review interaction; it did not modify real findings.
 
 No customer/third-party targets were scanned and no existing scan was deleted during verification. HTTP tests use fixtures, not production data. Groq key rotation and a Docker build are still outstanding. Run an authorized staging assessment and exercise the updated UI before deployment; no claim is made that the new code has been tested against live sqlmap/nmap services or production targets.

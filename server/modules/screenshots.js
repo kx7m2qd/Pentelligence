@@ -2,6 +2,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { execa } from 'execa';
 import db from '../db.js';
+import { assertScanTarget } from '../scanGuard.js';
 
 const BROWSERS = ['/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', '/usr/bin/chromium', '/usr/bin/chromium-browser', '/usr/bin/google-chrome'];
 
@@ -19,6 +20,7 @@ export async function captureScreenshots(scanId, assets, emitLog) {
   await fs.mkdir(directory, { recursive: true });
   const results = [];
   for (const asset of assets.slice(0, 50)) {
+    await assertScanTarget(scanId, asset.url);
     const safeName = asset.hostname.replace(/[^a-z0-9.-]/gi, '_');
     const filePath = path.join(directory, `${safeName}.png`);
     const outcome = await execa(browser, ['--headless', '--disable-gpu', '--no-sandbox', `--window-size=1440,900`, `--screenshot=${filePath}`, asset.url], { reject: false, timeout: 20_000 });

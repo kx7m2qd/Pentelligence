@@ -1,4 +1,5 @@
 import db from '../db.js';
+import { assertScanTarget } from '../scanGuard.js';
 
 function extractTitle(html) {
   return String(html || '').match(/<title[^>]*>([^<]{0,200})<\/title>/i)?.[1]?.replace(/\s+/g, ' ').trim() || '';
@@ -34,6 +35,7 @@ export async function runWebProbe(scanId, targets, emitLog) {
   const insert = db.prepare(`INSERT INTO web_assets (scan_id, hostname, url, status_code, title, server, content_type, content_length, redirect_url, response_time_ms) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
   const assets = [];
   for (const hostname of [...new Set(targets)].slice(0, 200)) {
+    await assertScanTarget(scanId, hostname);
     let result = await probe(`https://${hostname}`);
     let url = `https://${hostname}`;
     if (!result) {

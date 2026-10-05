@@ -39,6 +39,7 @@ export function buildFindingMarkdown(finding) {
   lines.push(`## ${finding.title || finding.name || finding.cve_id || 'Finding'}`);
   lines.push('');
   lines.push(`- Severity: ${String(finding.severity || 'unknown').toUpperCase()}`);
+  lines.push(`- Confidence: ${finding.confidence || 'unconfirmed'}`);
   lines.push(`- Asset: ${finding.host || 'unknown'}`);
   if (finding.matched_at) lines.push(`- Matched at: ${finding.matched_at}`);
   if (finding.cve_id || finding.template_id) lines.push(`- Reference: ${finding.cve_id || finding.template_id}`);

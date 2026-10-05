@@ -22,6 +22,9 @@ const ollamaModel = String(process.env.OLLAMA_MODEL || "llama3.1:8b").trim();
 export const config = {
   port: Number.parseInt(process.env.PORT || "3001", 10),
   appPassword: String(process.env.APP_PASSWORD || "").trim(),
+  analystPassword: String(process.env.ANALYST_PASSWORD || '').trim(),
+  maxWorkspaceScans: Math.max(1, Number(process.env.MAX_WORKSPACE_SCANS) || 1),
+  maxDailyScans: Math.max(1, Number(process.env.MAX_DAILY_SCANS) || 20),
   aiProvider,
   aiEnabled: aiProvider === "ollama" || Boolean(groqApiKey),
   aiModel: aiProvider === "ollama" ? ollamaModel : groqModel,
@@ -50,6 +53,7 @@ export const DEFAULT_DEV_ORIGINS = [
 ];
 
 export function validateProductionConfig() {
+  if (config.analystPassword && (!config.appPassword || config.analystPassword.length < 16 || config.analystPassword === config.appPassword)) throw new Error('ANALYST_PASSWORD requires a distinct password of at least 16 characters and APP_PASSWORD');
   if (config.appPassword && config.appPassword.length < 16) {
     throw new Error("APP_PASSWORD must be at least 16 characters when enabled");
   }

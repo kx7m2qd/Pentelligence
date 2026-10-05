@@ -10,8 +10,8 @@ import {
 
 const router = express.Router();
 
-function passwordMatches(candidate) {
-  const expected = Buffer.from(config.appPassword);
+function passwordMatches(candidate, password = config.appPassword) {
+  const expected = Buffer.from(password);
   const supplied = Buffer.from(String(candidate || ''));
   return expected.length === supplied.length && crypto.timingSafeEqual(expected, supplied);
 }
@@ -26,11 +26,12 @@ router.get('/status', (req, res) => {
 
 router.post('/login', (req, res) => {
   if (!config.appPassword) return res.json({ authenticationRequired: false, authenticated: true });
-  if (!passwordMatches(req.body?.password)) return res.status(401).json({ error: 'invalid password' });
+  const role = passwordMatches(req.body?.password) ? 'admin' : config.analystPassword && passwordMatches(req.body?.password, config.analystPassword) ? 'analyst' : null;
+  if (!role) return res.status(401).json({ error: 'invalid password' });
 
   cleanupExpiredSessions();
-  const session = createAccessSession(config.sessionTtlHours);
-  res.status(201).json({ accessToken: session.token, expiresInHours: config.sessionTtlHours });
+  const session = createAccessSession(config.sessionTtlHours, role);
+  res.status(201).json({ accessToken: session.token, expiresInHours: config.sessionTtlHours, role });
 });
 
 router.post('/logout', (req, res) => {

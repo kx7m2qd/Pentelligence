@@ -1,5 +1,7 @@
+import { logger } from "../logger.js";
 import { execa } from 'execa';
 import db from '../db.js';
+import { assertScanTarget } from '../scanGuard.js';
 import { beginScanTask, endScanTask } from '../scanState.js';
 import { buildNucleiArgs } from '../nuclei-args.js';
 import { templatesDir as TEMPLATES_DIR, templatesExist } from './templates.js';
@@ -8,8 +10,8 @@ function insertFinding(finding) {
   db.prepare(`
     INSERT OR IGNORE INTO nuclei_findings
       (scan_id, host_id, template_id, name, severity, cvss_score,
-       cve_id, description, matched_at, curl_cmd, confirmed, source)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       cve_id, description, matched_at, curl_cmd, confirmed, source, confidence)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'confirmed')
   `).run(
     finding.scan_id,
     finding.host_id,
@@ -42,10 +44,10 @@ export async function runNuclei(host, scanId, options = {}) {
   } catch (err) {
     const notInstalled = err.code === 'ENOENT' || err.message?.includes('not found');
     if (notInstalled) {
-      console.warn(`[nuclei] nuclei is NOT INSTALLED — skipping scan for ${target}. Install with: brew install nuclei`);
+      logger.warn(`[nuclei] nuclei is NOT INSTALLED — skipping scan for ${target}. Install with: brew install nuclei`);
       return { results: [], skipped: true, error: 'nuclei is not installed' };
     }
-    console.warn(`[nuclei] execution failed for ${target}: ${err.code || err.message}`);
+    logger.warn(`[nuclei] execution failed for ${target}: ${err.code || err.message}`);
     return { results: [], skipped: false, error: err.message };
   }
 
@@ -76,13 +78,13 @@ export async function runNuclei(host, scanId, options = {}) {
     }
   }
 
-  console.log(`[nuclei] ${results.length} confirmed findings on ${target}`);
+  logger.info(`[nuclei] ${results.length} confirmed findings on ${target}`);
   return { results, skipped: false, error: null };
 }
 
 export async function runNucleiOnScan(scanId, emitLog, options = {}) {
   const log = msg => {
-    console.log(`[nuclei] ${msg}`);
+    logger.info(`[nuclei] ${msg}`);
     if (emitLog) emitLog(`[nuclei] ${msg}`);
   };
 
@@ -120,6 +122,7 @@ export async function runNucleiOnScan(scanId, emitLog, options = {}) {
       }
 
       const label = host.hostname || host.ip;
+      await assertScanTarget(scanId, label);
       log(`Scanning ${label} — templates: ${recommendedCves.length > 0 ? recommendedCves.join(', ') : 'critical/high'}`);
 
       const outcome = await runNuclei(host, scanId, { ...options, cves: recommendedCves });

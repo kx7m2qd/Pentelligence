@@ -1,3 +1,4 @@
+import { logger } from "../logger.js";
 import fs from 'fs';
 import path from 'path';
 import { execa } from 'execa';
@@ -48,13 +49,13 @@ export async function startUpdate() {
   }
 
   updating = true;
-  console.log(`[templates] updating nuclei templates into ${templatesDir} ...`);
+  logger.info(`[templates] updating nuclei templates into ${templatesDir} ...`);
 
   try {
     await execa('nuclei', ['-update-templates'], { reject: false });
-    console.log('[templates] nuclei template update finished');
+    logger.info('[templates] nuclei template update finished');
   } catch (err) {
-    console.warn(`[templates] template update failed: ${err.message}`);
+    logger.warn(`[templates] template update failed: ${err.message}`);
   } finally {
     updating = false;
   }
@@ -68,13 +69,13 @@ export function ensureTemplates() {
   const status = templatesStatus();
 
   if (!status.exists) {
-    console.warn(`[templates] library missing at ${templatesDir} — downloading in the background`);
+    logger.warn(`[templates] library missing at ${templatesDir} — downloading in the background`);
     void startUpdate();
     return;
   }
 
   if (isStale(fs.statSync(templatesDir).mtimeMs)) {
-    console.log('[templates] library older than 7 days — refreshing in the background');
+    logger.info('[templates] library older than 7 days — refreshing in the background');
     void startUpdate();
   }
 }

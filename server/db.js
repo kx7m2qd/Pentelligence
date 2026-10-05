@@ -7,7 +7,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const dataDir = path.join(__dirname, '../data');
 fs.mkdirSync(dataDir, { recursive: true });
 
-const db = new Database(path.join(dataDir, 'pentest.db'));
+const db = new Database(process.env.PENTELLIGENCE_DB_PATH || path.join(dataDir, 'pentest.db'));
 
 db.pragma("journal_mode = WAL");
 db.pragma("foreign_keys = ON");
@@ -211,6 +211,28 @@ db.exec(`
     FOREIGN KEY (scan_id) REFERENCES scans(id),
     FOREIGN KEY (host_id) REFERENCES hosts(id)
   );
+`);
+
+for (const [table, fallback] of [['findings', 'suggested'], ['nuclei_findings', 'unconfirmed'], ['exploit_results', 'unconfirmed']]) {
+  if (!db.prepare(`PRAGMA table_info(${table})`).all().some(column => column.name === 'confidence')) {
+    db.exec(`ALTER TABLE ${table} ADD COLUMN confidence TEXT NOT NULL DEFAULT '${fallback}' CHECK(confidence IN ('confirmed','suggested','unconfirmed'))`);
+    // Legacy scanner/exploit matches have not been independently reviewed.
+    if (table === 'exploit_results') db.exec("UPDATE exploit_results SET confidence = 'suggested' WHERE confirmed = 0 AND output LIKE 'curl:%'");
+  }
+}
+if (!db.prepare('PRAGMA table_info(access_sessions)').all().some(column => column.name === 'role')) {
+  db.exec("ALTER TABLE access_sessions ADD COLUMN role TEXT NOT NULL DEFAULT 'admin' CHECK(role IN ('admin','analyst'))");
+}
+db.exec(`
+  CREATE TABLE IF NOT EXISTS audit_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT, workspace_id INTEGER, actor_session_id INTEGER,
+    request_id TEXT, action TEXT NOT NULL, target TEXT NOT NULL DEFAULT '',
+    authorization_note TEXT NOT NULL DEFAULT '', outcome TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  );
+  CREATE TRIGGER IF NOT EXISTS audit_no_update BEFORE UPDATE ON audit_events BEGIN SELECT RAISE(ABORT, 'audit events are append-only'); END;
+  CREATE TRIGGER IF NOT EXISTS audit_no_delete BEFORE DELETE ON audit_events BEGIN SELECT RAISE(ABORT, 'audit events are append-only'); END;
+  CREATE INDEX IF NOT EXISTS audit_workspace ON audit_events(workspace_id, id);
 `);
 
 const existingScanColumns = db.prepare("PRAGMA table_info(scans)").all();

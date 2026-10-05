@@ -138,3 +138,15 @@ export async function apiStream(path, onEvent, signal) {
     }
   }
 }
+
+export async function apiDownload(path, filename) {
+  const headers = { 'x-workspace-token': await ensureWorkspace() };
+  const response = await request(path, { headers });
+  if (!response.ok) throw new Error(`Export failed (${response.status})`);
+  const url = URL.createObjectURL(await response.blob());
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}

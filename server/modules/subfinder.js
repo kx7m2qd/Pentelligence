@@ -1,10 +1,11 @@
+import { logger } from "../logger.js";
 import { execa } from 'execa';
 import db from '../db.js';
 
 const BREW_PATH = '/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin';
 
 async function runSubfinder(domain, scanId) {
-  console.log(`[subfinder] enumerating subdomains for ${domain}`);
+  logger.info(`[subfinder] enumerating subdomains for ${domain}`);
 
   let lines = [];
 
@@ -23,7 +24,7 @@ async function runSubfinder(domain, scanId) {
     if (err.stdout) {
       lines = err.stdout.split('\n').map(line => line.trim()).filter(Boolean);
     } else {
-      console.error(`[subfinder] FAILED to run: ${err.code || err.message}`);
+      logger.error(`[subfinder] FAILED to run: ${err.code || err.message}`);
       return [];
     }
   }
@@ -37,7 +38,7 @@ async function runSubfinder(domain, scanId) {
   });
 
   insertMany(uniqueLines);
-  console.log(`[subfinder] found ${uniqueLines.length} subdomains`);
+  logger.info(`[subfinder] found ${uniqueLines.length} subdomains`);
   return uniqueLines;
 }
 

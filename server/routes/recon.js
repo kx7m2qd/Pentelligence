@@ -9,7 +9,7 @@ import { runAgentLoop } from '../modules/agent.js';
 import { runNucleiOnScan } from '../modules/nuclei.js';
 import { sanitizeTemplateTags } from '../nuclei-args.js';
 import { generateReport } from '../modules/groq.js';
-import { beginScanTask, clearScanCancellation, endScanTask, getActiveTaskCount, isAnyScanTaskActive, isScanCancellationRequested, requestScanCancellation } from '../scanState.js';
+import { beginScanTask, clearScanCancellation, endScanTask, isAnyScanTaskActive, isScanCancellationRequested, requestScanCancellation } from '../scanState.js';
 import { assertPublicResolution, filterPublicTargets, normalizeTargetInput } from '../targets.js';
 import { ownedScan } from '../workspaces.js';
 import { assertInScope } from '../scope.js';
@@ -19,6 +19,8 @@ import { captureScreenshots } from '../modules/screenshots.js';
 import { notifyScanEvent } from '../notifications.js';
 import { compareFindings } from '../fingerprints.js';
 import { getToolReadiness } from '../tools.js';
+import { audit, scanCapacity } from '../security.js';
+import { logger, withScanContext } from '../logger.js';
 
 // CLI binaries the recon pipeline shells out to. The AI provider is handled
 // separately (the agent phase is already guarded by config).
@@ -76,7 +78,12 @@ function scanStreamSnapshot(workspaceId, scanId) {
   const decisionRow = db.prepare("SELECT content FROM agent_logs WHERE scan_id = ? AND type = 'decision' ORDER BY id DESC LIMIT 1").get(scanId);
   let decision = null;
   try { decision = decisionRow ? JSON.parse(decisionRow.content) : null; } catch { decision = null; }
-  return { scan, stats: { hostsFound: hosts.length, openPorts }, logs, findingCount: findings + nucleiFindings, decision };
+  const changes = {
+    evidence: db.prepare('SELECT COUNT(*) AS count FROM evidence WHERE scan_id=?').get(scanId).count,
+    exploits: db.prepare('SELECT COUNT(*) AS count FROM exploit_results WHERE scan_id=?').get(scanId).count,
+    audit: db.prepare('SELECT MAX(id) AS id FROM audit_events WHERE workspace_id=?').get(workspaceId).id,
+  };
+  return { scan, stats: { hostsFound: hosts.length, openPorts }, logs, findingCount: findings + nucleiFindings, decision, changes };
 }
 
 function buildReportSummary(scan, hosts, findings, exploitResults) {
@@ -111,11 +118,20 @@ function buildReportSummary(scan, hosts, findings, exploitResults) {
 }
 
 export async function runReconPipeline(scanId, target, scopeRules = null, excludeRules = [], options = {}) {
+  return withScanContext(scanId, () => executeReconPipeline(scanId, target, scopeRules, excludeRules, options));
+}
+
+async function executeReconPipeline(scanId, target, scopeRules, excludeRules, options) {
   if (!beginScanTask(scanId, 'pipeline')) {
     return;
   }
 
   try {
+    const scan = db.prepare('SELECT workspace_id FROM scans WHERE id=?').get(scanId);
+    logger.info({ scanId, workspaceId: scan?.workspace_id }, 'pipeline started');
+    assertInScope(target, scopeRules && { scope: scopeRules, excludes: excludeRules });
+    await assertPublicResolution(target, { allowPrivateTargets: config.allowPrivateTargets });
+    audit({ workspaceId: scan?.workspace_id, action: 'pipeline.start', target, outcome: 'started' });
     const checkCancellation = () => {
       if (isScanCancellationRequested(scanId)) {
         const error = new Error('Scan cancelled by operator');
@@ -184,7 +200,7 @@ export async function runReconPipeline(scanId, target, scopeRules = null, exclud
     setScanState(scanId, { status: 'done', phase: 'done', message: 'Recon pipeline complete', error_message: '' });
     if (options.notifyCompletion !== false) void notifyScanEvent({ target, message: 'scan complete' });
   } catch (err) {
-    console.error('[recon] pipeline error:', err.message);
+    logger.error('[recon] pipeline error:', err.message);
     setScanState(scanId, err.code === 'SCAN_CANCELLED'
       ? { status: 'cancelled', phase: 'cancelled', message: 'Scan cancelled by operator', error_message: '' }
       : { status: 'error', phase: 'error', message: 'Recon pipeline failed', error_message: err.message });
@@ -192,6 +208,8 @@ export async function runReconPipeline(scanId, target, scopeRules = null, exclud
   } finally {
     clearScanCancellation(scanId);
     endScanTask(scanId, 'pipeline');
+    const finished = db.prepare('SELECT workspace_id,status FROM scans WHERE id=?').get(scanId);
+    if (finished) audit({ workspaceId: finished.workspace_id, action: 'pipeline.finish', target, outcome: finished.status });
   }
 }
 
@@ -203,7 +221,8 @@ export async function runScheduledProgramScan(schedule) {
   const excludeRules = JSON.parse(program.excludes_json || '[]');
   assertInScope(target, { scope: scopeRules, excludes: excludeRules });
   await assertPublicResolution(target, { allowPrivateTargets: config.allowPrivateTargets });
-  if (getActiveTaskCount() >= config.maxConcurrentScans) throw new Error('scan capacity reached');
+  const capacity = scanCapacity(schedule.workspace_id);
+  if (capacity) throw new Error(capacity);
   const existing = db.prepare(`SELECT id FROM scans WHERE target = ? AND workspace_id = ? AND status = 'running' LIMIT 1`).get(target, schedule.workspace_id);
   if (existing) throw new Error('target already has a running scan');
   db.prepare(`INSERT INTO scope_authorizations (workspace_id, target, authorization_note) VALUES (?, ?, ?)`)
@@ -251,8 +270,9 @@ router.post('/start', async (req, res) => {
   } catch (err) {
     return res.status(403).json({ error: err.message });
   }
-  if (getActiveTaskCount() >= config.maxConcurrentScans) {
-    return res.status(429).json({ error: `scan capacity reached; at most ${config.maxConcurrentScans} scan tasks may run at once` });
+  const capacity = scanCapacity(req.workspaceId);
+  if (capacity) {
+    return res.status(429).json({ error: capacity });
   }
 
   db.prepare(`
@@ -332,15 +352,11 @@ router.get('/events/:scanId', (req, res) => {
   const intervalId = setInterval(() => {
     if (closed) return;
     const snapshot = scanStreamSnapshot(req.workspaceId, scanId);
-    if (!snapshot) return;
+    if (!snapshot) { res.end(); return; }
     const payload = JSON.stringify(snapshot);
     if (payload !== last) {
       last = payload;
       res.write(`event: scan\ndata: ${payload}\n\n`);
-    }
-    if (['done', 'error', 'cancelled'].includes(snapshot.scan.status)) {
-      clearInterval(intervalId);
-      setTimeout(() => res.end(), 250);
     }
   }, 750);
   const heartbeatId = setInterval(() => { if (!closed) res.write(': heartbeat\n\n'); }, 15000);
@@ -393,7 +409,8 @@ router.get('/compare/:scanId', (req, res) => {
     ...db.prepare('SELECT f.*, h.hostname, h.ip FROM findings f JOIN hosts h ON h.id = f.host_id WHERE f.scan_id = ?').all(scanId).map(finding => ({ ...finding, source: 'agent' })),
     ...db.prepare('SELECT n.*, h.hostname, h.ip FROM nuclei_findings n JOIN hosts h ON h.id = n.host_id WHERE n.scan_id = ?').all(scanId).map(finding => ({ ...finding, title: finding.name, score: finding.cvss_score, source: 'nuclei' })),
   ];
-  res.json({ previous, comparison: compareFindings(loadFindings(previous.id), loadFindings(scan.id)) });
+  const olderScans = db.prepare("SELECT id FROM scans WHERE workspace_id=? AND target=? AND status='done' AND id<? ORDER BY id DESC LIMIT 100").all(req.workspaceId, scan.target, previous.id);
+  res.json({ previous, comparison: compareFindings(loadFindings(previous.id), loadFindings(scan.id), olderScans.flatMap(row => loadFindings(row.id))) });
 });
 
 router.get('/report/:scanId', async (req, res) => {
@@ -440,20 +457,22 @@ router.get('/report/:scanId', async (req, res) => {
 
   let report = null;
 
-  if (config.aiEnabled && findings.length > 0) {
+  const confirmedFindings = findings.filter(finding => finding.confidence === 'confirmed');
+  const confirmedExploits = exploitResults.filter(finding => finding.confidence === 'confirmed');
+  if (config.aiEnabled && confirmedFindings.length > 0) {
     try {
       report = await generateReport({
         target: scan.target,
         hosts,
-        findings,
+        findings: confirmedFindings,
       });
     } catch (err) {
-      console.error('[report] AI generation failed:', err.message);
+      logger.error('[report] AI generation failed:', err.message);
     }
   }
 
   if (!report) {
-    report = buildReportSummary(scan, hosts, findings, exploitResults);
+    report = buildReportSummary(scan, hosts, confirmedFindings, confirmedExploits);
   }
 
   res.json({
@@ -462,6 +481,9 @@ router.get('/report/:scanId', async (req, res) => {
       scan,
       hostCount: hosts.length,
       findingCount: findings.length,
+      confirmedFindingCount: confirmedFindings.length,
+      suggestedFindingCount: findings.filter(finding => finding.confidence === 'suggested').length,
+      unconfirmedFindingCount: findings.filter(finding => finding.confidence === 'unconfirmed').length,
       exploitCount: exploitResults.length,
     },
   });
@@ -514,8 +536,9 @@ router.post('/retry/:scanId', async (req, res) => {
   if (isAnyScanTaskActive(scan.id)) {
     return res.status(409).json({ error: 'scan is currently active' });
   }
-  if (getActiveTaskCount() >= config.maxConcurrentScans) {
-    return res.status(429).json({ error: `scan capacity reached; at most ${config.maxConcurrentScans} scan tasks may run at once` });
+  const capacity = scanCapacity(req.workspaceId);
+  if (capacity) {
+    return res.status(429).json({ error: capacity });
   }
 
   const program = scan.program_id

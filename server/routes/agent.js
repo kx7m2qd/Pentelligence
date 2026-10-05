@@ -4,6 +4,7 @@ import { config } from "../config.js";
 import { runAgentLoop } from "../modules/agent.js";
 import { beginScanTask, endScanTask } from "../scanState.js";
 import { ownedScan } from "../workspaces.js";
+import { auditTaskAdmission } from '../security.js';
 
 const router = express.Router();
 
@@ -14,12 +15,16 @@ router.post("/run/:scanId", async (req, res) => {
   if (!scan) return res.status(404).json({ error: "scan not found" });
   if (!config.aiEnabled) return res.status(400).json({ error: "AI provider is not configured" });
   if (!beginScanTask(scanId, "agent")) return res.status(409).json({ error: "agent loop already running" });
+  try { auditTaskAdmission(req, scan, 'agent'); }
+  catch (error) { endScanTask(scanId, 'agent'); throw error; }
 
   res.status(202).json({ message: "agent loop started", scanId });
 
   void runAgentLoop(scanId, msg => {
     db.prepare("INSERT INTO agent_logs (scan_id, type, content) VALUES (?, ?, ?)")
       .run(scanId, "log", msg);
+  }).catch(() => {
+    req.log?.error({ scanId }, 'agent task failed');
   }).finally(() => {
     endScanTask(scanId, "agent");
   });

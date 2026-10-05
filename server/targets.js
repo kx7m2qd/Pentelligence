@@ -29,15 +29,18 @@ function normalizeHostname(value) {
 function isPrivateAddress(address) {
   if (net.isIP(address) === 4) return isPrivateIPv4(address);
   const value = address.toLowerCase();
-  return value === '::1' || value.startsWith('fc') || value.startsWith('fd') || value.startsWith('fe8') || value.startsWith('fe9') || value.startsWith('fea') || value.startsWith('feb');
+  return value === '::' || value === '::1' || value.startsWith('::ffff:') || value.startsWith('ff') || value.startsWith('fc') || value.startsWith('fd') || value.startsWith('fe8') || value.startsWith('fe9') || value.startsWith('fea') || value.startsWith('feb');
 }
 
 export async function assertPublicResolution(target, options = {}) {
-  if (options.allowPrivateTargets || net.isIP(target) || target.includes('/')) return;
+  if (!options.allowPrivateTargets && LOCAL_HOSTS.has(target)) throw new Error('private or local target is blocked');
+  const normalized = normalizeTargetInput(target, options).normalizedTarget;
+  if (net.isIP(normalized) || normalized.includes('/')) return [normalized];
   let addresses;
-  try { addresses = await dns.lookup(target, { all: true, verbatim: true }); }
+  try { addresses = await (options.lookup || dns.lookup)(normalized, { all: true, verbatim: true }); }
   catch { throw new Error(`target ${target} does not resolve`); }
-  if (addresses.some(item => isPrivateAddress(item.address))) throw new Error(`target ${target} resolves to a private or local address`);
+  if (!addresses.length || addresses.some(item => !net.isIP(item.address) || (!options.allowPrivateTargets && isPrivateAddress(item.address)))) throw new Error(`target ${target} resolves to a private or local address`);
+  return addresses.map(item => item.address);
 }
 
 export async function filterPublicTargets(targets, options = {}) {
@@ -82,14 +85,14 @@ export function normalizeTargetInput(rawTarget, options = {}) {
 
   if (candidate.includes("/") && !candidate.includes("://")) {
     const [host, prefix] = candidate.split("/");
-    const prefixNum = Number.parseInt(prefix, 10);
+    const prefixNum = Number(prefix);
 
-    if (!host || prefix === undefined || prefixNum < 0 || prefixNum > 32 || net.isIP(host) !== 4) {
+    if (candidate.split('/').length !== 2 || !/^\d{1,2}$/.test(prefix || '') || !host || prefixNum < 0 || prefixNum > 32 || net.isIP(host) !== 4) {
       throw new Error("CIDR targets must use a valid IPv4 range");
     }
 
-    if (!allowPrivateTargets && isPrivateIPv4(host)) {
-      throw new Error("private network targets are blocked by default");
+    if (!allowPrivateTargets) {
+      throw new Error('CIDR scanning requires explicit private network policy approval');
     }
 
     return { normalizedTarget: `${host}/${prefixNum}`, kind: "cidr" };

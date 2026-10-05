@@ -5,8 +5,8 @@ ARG NODE_VERSION=24-bookworm-slim
 
 FROM golang:${GO_VERSION} AS tool-builder
 
-ARG NUCLEI_VERSION=latest
-ARG SUBFINDER_VERSION=latest
+ARG NUCLEI_VERSION=v3.8.0
+ARG SUBFINDER_VERSION=v2.14.0
 
 RUN go install github.com/projectdiscovery/nuclei/v3/cmd/nuclei@${NUCLEI_VERSION} \
   && go install github.com/projectdiscovery/subfinder/v2/cmd/subfinder@${SUBFINDER_VERSION}
@@ -43,7 +43,7 @@ RUN npm run build \
 
 USER node
 
-RUN nuclei -update-templates -silent || true
+# Templates are provisioned at runtime, not downloaded into an unreproducible build layer.
 
 EXPOSE 3001
 

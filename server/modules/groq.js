@@ -1,5 +1,6 @@
 import Groq from "groq-sdk";
 import { config } from "../config.js";
+import { parseAI, hostSchema, decisionSchema, reportSchema } from '../aiSchemas.js';
 
 const groq = config.aiProvider === 'groq' && config.groqApiKey ? new Groq({ apiKey: config.groqApiKey }) : null;
 
@@ -119,9 +120,9 @@ Respond with this exact JSON structure:
 
   const raw = response.choices[0]?.message?.content || "{}";
   try {
-    return JSON.parse(raw);
+    return parseAI(raw, hostSchema);
   } catch {
-    return { risk: "unknown", cves: [], attack_surface: [], reasoning: raw };
+    return { risk: "unknown", cves: [], attack_surface: [], reasoning: 'AI response failed validation' };
   }
 }
 
@@ -157,9 +158,9 @@ Respond with this exact JSON:
 
   const raw = response.choices[0]?.message?.content || "{}";
   try {
-    return JSON.parse(raw);
+    return parseAI(raw, decisionSchema);
   } catch {
-    return { next_action: "manual", reason: raw };
+    return { next_action: "manual", reason: 'AI response failed validation' };
   }
 }
 
@@ -206,8 +207,8 @@ Respond with this exact JSON:
 
   const raw = response.choices[0]?.message?.content || "{}";
   try {
-    return JSON.parse(raw);
+    return parseAI(raw, reportSchema);
   } catch {
-    return { executive_summary: raw };
+    return null;
   }
 }

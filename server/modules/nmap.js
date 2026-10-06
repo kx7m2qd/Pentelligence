@@ -5,8 +5,7 @@ import db from '../db.js';
 import { assertScanTarget } from '../scanGuard.js';
 import { isIP } from 'node:net';
 
-const BREW_PATH = '/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin';
-const NMAP_BINARY = process.env.NMAP_PATH || 'nmap';
+import { toolExecution } from '../toolExecution.js';
 
 function upsertHost(scanId, ip, hostname, osName) {
   const existing = db.prepare(`
@@ -61,7 +60,8 @@ async function runNmap(targets, scanId, portProfile = 'standard') {
   let xmlOutput = '';
 
   try {
-    const { stdout } = await execa(NMAP_BINARY, [
+    const execution = toolExecution('nmap');
+    const { stdout } = await execa(execution.command, [
       '-Pn',
       '-n',
       '-sT',
@@ -73,7 +73,7 @@ async function runNmap(targets, scanId, portProfile = 'standard') {
       '-oX', '-',
       ...pinned.keys(),
     ], {
-      env: { ...process.env, PATH: BREW_PATH },
+      env: execution.env,
       timeout: isFullScan
         ? Math.min(900_000, 120_000 + (targetList.length * 30_000))
         : Math.min(300_000, 45_000 + (targetList.length * 8_000)),

@@ -1,5 +1,6 @@
 import { execa } from 'execa';
 import { config } from './config.js';
+import { toolExecution } from './toolExecution.js';
 
 const TOOL_DEFINITIONS = [
   {
@@ -45,11 +46,12 @@ function firstLine(value) {
     .find(Boolean) || null;
 }
 
-async function checkBinary(definition) {
+export async function checkBinary(definition, execute = execa, environment = process.env) {
+  const { command, env } = toolExecution(definition.command, environment);
   let resolved;
 
   try {
-    resolved = await execa('which', [definition.command], { reject: false });
+    resolved = await execute('which', [command], { reject: false, env });
   } catch {
     resolved = { exitCode: 1, stdout: '' };
   }
@@ -59,7 +61,8 @@ async function checkBinary(definition) {
 
   if (installed && definition.versionArgs?.length) {
     try {
-      const result = await execa(definition.command, definition.versionArgs, {
+      const result = await execute(command, definition.versionArgs, {
+        env,
         reject: false,
         timeout: 3000,
       });

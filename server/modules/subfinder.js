@@ -2,7 +2,7 @@ import { logger } from "../logger.js";
 import { execa } from 'execa';
 import db from '../db.js';
 
-const BREW_PATH = '/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin';
+import { toolExecution } from '../toolExecution.js';
 
 async function runSubfinder(domain, scanId) {
   logger.info(`[subfinder] enumerating subdomains for ${domain}`);
@@ -15,7 +15,7 @@ async function runSubfinder(domain, scanId) {
       '-silent',
       '-o', '/dev/stdout',
     ], {
-      env: { ...process.env, PATH: BREW_PATH },
+      env: toolExecution('subfinder').env,
       timeout: 60_000,
     });
 

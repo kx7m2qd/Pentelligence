@@ -56,7 +56,8 @@ export async function checkBinary(definition, execute = execa, environment = pro
     resolved = { exitCode: 1, stdout: '' };
   }
 
-  const installed = resolved.exitCode === 0 && Boolean(resolved.stdout?.trim());
+  const found = resolved.exitCode === 0 && Boolean(resolved.stdout?.trim());
+  let installed = found;
   let version = null;
 
   if (installed && definition.versionArgs?.length) {
@@ -66,8 +67,10 @@ export async function checkBinary(definition, execute = execa, environment = pro
         reject: false,
         timeout: 3000,
       });
+      installed = result.exitCode === 0;
       version = firstLine(result.stdout) || firstLine(result.stderr);
     } catch (err) {
+      installed = false;
       version = firstLine(err.stdout) || firstLine(err.stderr);
     }
   }
@@ -78,15 +81,17 @@ export async function checkBinary(definition, execute = execa, environment = pro
     command: definition.command,
     required: definition.required,
     installed,
-    path: installed ? resolved.stdout.trim() : null,
+    path: found ? resolved.stdout.trim() : null,
     version,
     status: installed ? 'ready' : definition.required ? 'missing' : 'optional',
-    recommendation: installed ? null : definition.recommendation,
+    recommendation: installed ? null : found
+      ? `${definition.label} was found but its version check failed. Check executable permissions, runtime dependencies and binary compatibility.`
+      : definition.recommendation,
   };
 }
 
-export async function getToolReadiness() {
-  const tools = await Promise.all(TOOL_DEFINITIONS.map(checkBinary));
+export async function getToolReadiness(execute = execa, environment = process.env) {
+  const tools = await Promise.all(TOOL_DEFINITIONS.map(definition => checkBinary(definition, execute, environment)));
   const ai = {
     id: 'ai',
     label: config.aiProvider === 'ollama' ? 'Ollama AI' : 'Groq AI',

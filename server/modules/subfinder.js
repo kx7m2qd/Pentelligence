@@ -7,7 +7,7 @@ import { toolExecution } from '../toolExecution.js';
 async function runSubfinder(domain, scanId) {
   logger.info(`[subfinder] enumerating subdomains for ${domain}`);
 
-  let lines = [];
+  let lines;
 
   try {
     const { stdout } = await execa('subfinder', [

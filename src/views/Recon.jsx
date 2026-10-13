@@ -173,7 +173,7 @@ export default function Recon({ scanId, focusHost, onGoLive }) {
     return (data?.evidence || [])
       .filter(item => item.type === 'screenshot' && item.path)
       .map(item => {
-        let meta = {};
+        let meta;
         try { meta = JSON.parse(item.metadata_json || '{}'); } catch { meta = {}; }
         const filename = item.path.split('/').pop();
         return {

@@ -57,7 +57,7 @@ async function runNmap(targets, scanId, portProfile = 'standard') {
   const isFullScan = selectedProfile === 'full';
   logger.info(`[nmap] starting ${selectedProfile} scan on ${targetList.length} target(s)`);
 
-  let xmlOutput = '';
+  let xmlOutput;
 
   try {
     const execution = toolExecution('nmap');
@@ -86,9 +86,9 @@ async function runNmap(targets, scanId, portProfile = 'standard') {
     } else {
       logger.error(`[nmap] FAILED to run real scan: ${err.code || err.message}`);
       if (err.timedOut) {
-        throw new Error('nmap scan timed out before producing complete output');
+        throw new Error('nmap scan timed out before producing complete output', { cause: err });
       }
-      throw new Error('nmap is not installed or not available in PATH');
+      throw new Error('nmap is not installed or not available in PATH', { cause: err });
     }
   }
 

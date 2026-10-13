@@ -143,7 +143,7 @@ async function executeReconPipeline(scanId, target, scopeRules, excludeRules, op
     const toolsError = await missingToolsMessage();
     if (toolsError) {
       setScanState(scanId, { status: 'error', phase: 'error', message: 'Missing required tools', error_message: toolsError });
-      void notifyScanEvent({ target, message: `scan blocked: ${toolsError}` });
+      if (options.notifyFailure !== false) void notifyScanEvent({ target, message: `scan blocked: ${toolsError}` });
       return;
     }
 

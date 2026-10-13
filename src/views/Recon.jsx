@@ -4,6 +4,7 @@ import { CH } from "../components/common/CH";
 import { EmptyState } from "../components/common/EmptyState";
 import TopologyMap from "../components/TopologyMap";
 import EvidenceDialog from "../components/EvidenceDialog";
+import EvidenceImage from '../components/EvidenceImage';
 import { apiGet, apiStream } from "../lib/api";
 import { rc } from "../utils/colors";
 import { summarizeForHosts } from "../utils/findings.js";
@@ -179,7 +180,7 @@ export default function Recon({ scanId, focusHost, onGoLive }) {
           ...item,
           filename,
           hostname: meta.hostname || item.target,
-          url: `/api/recon/evidence/${scanId}/${encodeURIComponent(filename)}`,
+          url: `/recon/evidence/${scanId}/${encodeURIComponent(filename)}`,
         };
       });
   }, [data?.evidence, scanId]);
@@ -301,7 +302,7 @@ export default function Recon({ scanId, focusHost, onGoLive }) {
                   onMouseLeave={e => { e.currentTarget.style.borderColor = "var(--border)"; }}
                 >
                   <div style={{ width: "100%", height: 160, overflow: "hidden", background: "#000", position: "relative" }}>
-                    <img
+                    <EvidenceImage
                       src={item.url}
                       alt={item.hostname}
                       style={{ width: "100%", height: "100%", objectFit: "cover" }}

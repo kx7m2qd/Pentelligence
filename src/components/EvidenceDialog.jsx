@@ -1,4 +1,5 @@
 import React, { useEffect, useRef } from 'react';
+import EvidenceImage from './EvidenceImage';
 
 export default function EvidenceDialog({ item, onClose }) {
   const ref = useRef(null);
@@ -20,7 +21,7 @@ export default function EvidenceDialog({ item, onClose }) {
           <div><strong>{item.hostname}</strong><p>{item.target}</p></div>
           <button type="button" autoFocus onClick={onClose} aria-label="Close screenshot">✕</button>
         </header>
-        <img src={item.url} alt={`Captured page for ${item.hostname}`} />
+        <EvidenceImage src={item.url} alt={`Captured page for ${item.hostname}`} />
       </div>
     </dialog>
   );

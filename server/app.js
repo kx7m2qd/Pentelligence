@@ -50,7 +50,7 @@ app.use((req, res, next) => {
   });
   if (process.env.NODE_ENV === 'production') {
     res.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
-    res.set('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'");
+    res.set('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'");
   }
   next();
 });

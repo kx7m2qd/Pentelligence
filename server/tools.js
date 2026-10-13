@@ -1,5 +1,6 @@
 import { execa } from 'execa';
 import { config } from './config.js';
+import { toolExecution } from './toolExecution.js';
 
 const TOOL_DEFINITIONS = [
   {
@@ -45,26 +46,31 @@ function firstLine(value) {
     .find(Boolean) || null;
 }
 
-async function checkBinary(definition) {
+export async function checkBinary(definition, execute = execa, environment = process.env) {
+  const { command, env } = toolExecution(definition.command, environment);
   let resolved;
 
   try {
-    resolved = await execa('which', [definition.command], { reject: false });
+    resolved = await execute('which', [command], { reject: false, env });
   } catch {
     resolved = { exitCode: 1, stdout: '' };
   }
 
-  const installed = resolved.exitCode === 0 && Boolean(resolved.stdout?.trim());
+  const found = resolved.exitCode === 0 && Boolean(resolved.stdout?.trim());
+  let installed = found;
   let version = null;
 
   if (installed && definition.versionArgs?.length) {
     try {
-      const result = await execa(definition.command, definition.versionArgs, {
+      const result = await execute(command, definition.versionArgs, {
+        env,
         reject: false,
         timeout: 3000,
       });
+      installed = result.exitCode === 0;
       version = firstLine(result.stdout) || firstLine(result.stderr);
     } catch (err) {
+      installed = false;
       version = firstLine(err.stdout) || firstLine(err.stderr);
     }
   }
@@ -75,15 +81,17 @@ async function checkBinary(definition) {
     command: definition.command,
     required: definition.required,
     installed,
-    path: installed ? resolved.stdout.trim() : null,
+    path: found ? resolved.stdout.trim() : null,
     version,
     status: installed ? 'ready' : definition.required ? 'missing' : 'optional',
-    recommendation: installed ? null : definition.recommendation,
+    recommendation: installed ? null : found
+      ? `${definition.label} was found but its version check failed. Check executable permissions, runtime dependencies and binary compatibility.`
+      : definition.recommendation,
   };
 }
 
-export async function getToolReadiness() {
-  const tools = await Promise.all(TOOL_DEFINITIONS.map(checkBinary));
+export async function getToolReadiness(execute = execa, environment = process.env) {
+  const tools = await Promise.all(TOOL_DEFINITIONS.map(definition => checkBinary(definition, execute, environment)));
   const ai = {
     id: 'ai',
     label: config.aiProvider === 'ollama' ? 'Ollama AI' : 'Groq AI',

@@ -7,6 +7,7 @@ import { EmptyState } from '../components/common/EmptyState';
 import { apiGet, apiPatch, apiStream } from '../lib/api';
 import { sc, sb } from '../utils/colors';
 import { buildFindingMarkdown } from '../utils/findings.js';
+import EvidenceImage from '../components/EvidenceImage';
 
 function sourceMeta(finding) {
   if (finding.confidence === 'confirmed') return { label: 'CONFIRMED', color: 'var(--acc)', bg: 'rgba(184,255,87,.1)' };
@@ -56,7 +57,7 @@ export default function Findings({ scanId, onGoLive, onOpenHost }) {
           try { meta = JSON.parse(item.metadata_json || '{}'); } catch { meta = {}; }
           const filename = item.path.split('/').pop();
           const hostname = String(meta.hostname || item.target || '').toLowerCase();
-          if (hostname && !shots[hostname]) shots[hostname] = `/api/recon/evidence/${scanId}/${encodeURIComponent(filename)}`;
+          if (hostname && !shots[hostname]) shots[hostname] = `/recon/evidence/${scanId}/${encodeURIComponent(filename)}`;
         }
         setScreenshots(shots);
         setError('');
@@ -266,13 +267,11 @@ export default function Findings({ scanId, onGoLive, onOpenHost }) {
               {screenshots[String(selected.host || '').toLowerCase()] && (
                 <div>
                   <div className="eyebrow" style={{ marginBottom: 4 }}>SCREENSHOT EVIDENCE</div>
-                  <a href={screenshots[String(selected.host || '').toLowerCase()]} target="_blank" rel="noreferrer">
-                    <img
+                    <EvidenceImage linked
                       src={screenshots[String(selected.host || '').toLowerCase()]}
                       alt={`Screenshot of ${selected.host}`}
                       style={{ width: '100%', maxHeight: 220, objectFit: 'cover', borderRadius: 8, border: '1px solid var(--border)' }}
                     />
-                  </a>
                 </div>
               )}
 

@@ -1,5 +1,5 @@
 const runtimeConfig = window.__PENTELLIGENCE_CONFIG__ || {};
-const API_BASE = (runtimeConfig.apiBaseUrl || import.meta.env.VITE_API_BASE_URL || '/api').replace(/\/$/, '');
+const API_BASE = (runtimeConfig.apiBaseUrl || import.meta.env?.VITE_API_BASE_URL || '/api').replace(/\/$/, '');
 const WORKSPACE_KEY = 'pentelligence.workspace-token';
 const ACCESS_KEY = 'pentelligence.access-token';
 
@@ -149,4 +149,13 @@ export async function apiDownload(path, filename) {
   link.download = filename;
   link.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+export async function apiImage(path, signal) {
+  const headers = { 'x-workspace-token': await ensureWorkspace() };
+  const response = await request(path, { headers, signal });
+  if (!response.ok) throw new Error(`Screenshot unavailable (${response.status})`);
+  const type = response.headers.get('content-type')?.split(';')[0];
+  if (!['image/png', 'image/jpeg', 'image/webp'].includes(type)) throw new Error('Invalid screenshot response');
+  return response.blob();
 }

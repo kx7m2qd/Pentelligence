@@ -36,7 +36,7 @@ export const Sidebar = ({ active, setActive, collapsed, setCollapsed, mobileOpen
           );
         })}
       </nav>
-      <button type="button" className="sidebar-collapse" onClick={() => setCollapsed(value => !value)}>
+      <button type="button" className="sidebar-collapse" aria-label={collapsed ? 'Expand navigation' : 'Collapse navigation'} aria-expanded={!collapsed} onClick={() => setCollapsed(value => !value)}>
         <span style={{ transform: collapsed ? 'rotate(180deg)' : 'none', display: 'inline-flex', transition: 'transform .22s' }}><Icon name="chevron-left" size={13} /></span>
         {!collapsed && <span>Collapse</span>}
       </button>

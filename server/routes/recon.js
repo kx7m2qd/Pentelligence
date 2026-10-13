@@ -76,7 +76,7 @@ function scanStreamSnapshot(workspaceId, scanId) {
   const findings = db.prepare('SELECT COUNT(*) AS count FROM findings WHERE scan_id = ?').get(scanId)?.count || 0;
   const nucleiFindings = db.prepare('SELECT COUNT(*) AS count FROM nuclei_findings WHERE scan_id = ?').get(scanId)?.count || 0;
   const decisionRow = db.prepare("SELECT content FROM agent_logs WHERE scan_id = ? AND type = 'decision' ORDER BY id DESC LIMIT 1").get(scanId);
-  let decision = null;
+  let decision;
   try { decision = decisionRow ? JSON.parse(decisionRow.content) : null; } catch { decision = null; }
   const changes = {
     evidence: db.prepare('SELECT COUNT(*) AS count FROM evidence WHERE scan_id=?').get(scanId).count,
@@ -227,7 +227,7 @@ export async function runScheduledProgramScan(schedule) {
   if (existing) throw new Error('target already has a running scan');
   db.prepare(`INSERT INTO scope_authorizations (workspace_id, target, authorization_note) VALUES (?, ?, ?)`)
     .run(schedule.workspace_id, target, `Authorized recurring scan for program ${program.name}`);
-  let profile = {};
+  let profile;
   try { profile = JSON.parse(program.profile_json || '{}'); } catch { profile = {}; }
   profile.portProfile = profile.portProfile || 'standard';
   profile.templateTags = sanitizeTemplateTags(profile.templateTags);

@@ -36,7 +36,7 @@ export async function runNuclei(host, scanId, options = {}) {
     templatesAvailable: templatesExist(),
   });
 
-  let stdout = '';
+  let stdout;
 
   try {
     const result = await execa('nuclei', args, { reject: false });

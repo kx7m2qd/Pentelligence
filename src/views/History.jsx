@@ -16,7 +16,7 @@ function statusTone(status) {
 
 export default function History({ currentScanId, onOpenScan, onStartFresh, load = apiGet, remove = apiDelete }) {
   const [scans, setScans] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -39,8 +39,16 @@ export default function History({ currentScanId, onOpenScan, onStartFresh, load 
   }, [load]);
 
   useEffect(() => {
-    void loadHistory();
-  }, [loadHistory]);
+    let active = true;
+    load('/recon/scans').then(data => {
+      if (active) { setScans(data.scans || []); setError(''); }
+    }).catch(err => {
+      if (active) setError(err.message);
+    }).finally(() => {
+      if (active) setLoading(false);
+    });
+    return () => { active = false; };
+  }, [load]);
 
   const deleteScan = async scanId => {
     if (deleting || pendingDelete !== scanId) return;

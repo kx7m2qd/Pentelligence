@@ -45,8 +45,8 @@ router.post("/run/:scanId", async (req, res) => {
   void runNucleiOnScan(scanId, msg => {
     db.prepare("INSERT INTO agent_logs (scan_id, type, content) VALUES (?, ?, ?)")
       .run(scanId, "nuclei-log", msg);
-  }).catch(() => {
-    setScanState(scanId, { status: 'error', phase: 'error', message: 'Nuclei task failed' });
+  }).catch(error => {
+    setScanState(scanId, { status: 'error', phase: 'error', message: 'Nuclei checks incomplete', error_message: error.message });
     req.log?.error({ scanId }, 'nuclei task failed');
   }).finally(() => {
     const latestScan = db.prepare("SELECT status, phase FROM scans WHERE id = ?").get(scanId);

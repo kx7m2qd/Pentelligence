@@ -5,6 +5,7 @@ import { assertScanTarget } from '../scanGuard.js';
 import { beginScanTask, endScanTask } from '../scanState.js';
 import { buildNucleiArgs } from '../nuclei-args.js';
 import { templatesDir as TEMPLATES_DIR, templatesExist } from './templates.js';
+import { parseNucleiOutput } from '../nuclei-output.js';
 
 function insertFinding(finding) {
   db.prepare(`
@@ -28,7 +29,7 @@ function insertFinding(finding) {
   );
 }
 
-export async function runNuclei(host, scanId, options = {}) {
+export async function runNuclei(host, scanId, options = {}, execute = execa) {
   const target = host.hostname || host.ip;
 
   const args = buildNucleiArgs(target, options, {
@@ -36,13 +37,13 @@ export async function runNuclei(host, scanId, options = {}) {
     templatesAvailable: templatesExist(),
   });
 
-  let stdout;
+  let hits;
 
   try {
-    const result = await execa('nuclei', args, { reject: false });
-    stdout = result.stdout || '';
+    const result = await execute('nuclei', args, { reject: false });
+    hits = parseNucleiOutput(result);
   } catch (err) {
-    const notInstalled = err.code === 'ENOENT' || err.message?.includes('not found');
+    const notInstalled = err.code === 'ENOENT';
     if (notInstalled) {
       logger.warn(`[nuclei] nuclei is NOT INSTALLED — skipping scan for ${target}. Install with: brew install nuclei`);
       return { results: [], skipped: true, error: 'nuclei is not installed' };
@@ -53,9 +54,7 @@ export async function runNuclei(host, scanId, options = {}) {
 
   const results = [];
 
-  for (const line of stdout.split('\n').filter(Boolean)) {
-    try {
-      const hit = JSON.parse(line);
+  for (const hit of hits) {
       const finding = {
         scan_id: scanId,
         host_id: host.id,
@@ -73,16 +72,15 @@ export async function runNuclei(host, scanId, options = {}) {
 
       insertFinding(finding);
       results.push(finding);
-    } catch {
-      // Ignore malformed JSON lines from nuclei output.
-    }
   }
 
   logger.info(`[nuclei] ${results.length} confirmed findings on ${target}`);
   return { results, skipped: false, error: null };
 }
 
-export async function runNucleiOnScan(scanId, emitLog, options = {}) {
+export async function runNucleiOnScan(scanId, emitLog, options = {}, dependencies = {}) {
+  const run = dependencies.run || runNuclei;
+  const assertTarget = dependencies.assertTarget || assertScanTarget;
   const log = msg => {
     logger.info(`[nuclei] ${msg}`);
     if (emitLog) emitLog(`[nuclei] ${msg}`);
@@ -94,13 +92,13 @@ export async function runNucleiOnScan(scanId, emitLog, options = {}) {
   try {
     const hosts = db.prepare('SELECT * FROM hosts WHERE scan_id = ? ORDER BY hostname ASC, ip ASC').all(scanId);
     if (!hosts.length) {
-      log('No hosts to scan.');
-      return;
+      throw new Error('Nuclei checks incomplete: no hosts available to test');
     }
 
     log('Starting nuclei scan on all hosts...');
 
     let nucleiAvailable = true;
+    let failedHosts = 0;
 
     for (const host of hosts) {
       const agentLog = db.prepare(`
@@ -122,10 +120,10 @@ export async function runNucleiOnScan(scanId, emitLog, options = {}) {
       }
 
       const label = host.hostname || host.ip;
-      await assertScanTarget(scanId, label);
+      await assertTarget(scanId, label);
       log(`Scanning ${label} — templates: ${recommendedCves.length > 0 ? recommendedCves.join(', ') : 'critical/high'}`);
 
-      const outcome = await runNuclei(host, scanId, { ...options, cves: recommendedCves });
+      const outcome = await run(host, scanId, { ...options, cves: recommendedCves });
 
       // Handle the case where nuclei is not installed
       if (outcome.skipped) {
@@ -136,6 +134,7 @@ export async function runNucleiOnScan(scanId, emitLog, options = {}) {
       }
 
       if (outcome.error && !outcome.skipped) {
+        failedHosts++;
         log(`${label} — scan error: ${outcome.error}`);
         continue;
       }
@@ -152,11 +151,12 @@ export async function runNucleiOnScan(scanId, emitLog, options = {}) {
       }
     }
 
-    if (nucleiAvailable) {
-      log('Nuclei scan complete.');
-    } else {
-      log('Nuclei scan skipped — tool not available. Results are from AI analysis only.');
+    if (!nucleiAvailable || failedHosts) {
+      throw new Error(!nucleiAvailable
+        ? 'Nuclei checks incomplete: scanner unavailable'
+        : `Nuclei checks incomplete: ${failedHosts} host check(s) failed`);
     }
+    log('Nuclei scan complete.');
   } finally {
     // Only end the task if we registered it (avoids double-end if called from route)
     if (registered) {

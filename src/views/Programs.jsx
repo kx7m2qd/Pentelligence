@@ -53,6 +53,7 @@ export default function Programs({ selectedProgram, onSelect }) {
   const [testTarget, setTestTarget] = useState('');
   const [activeTesterProgramId, setActiveTesterProgramId] = useState(null);
   const [scheduleDraft, setScheduleDraft] = useState({ target: '', intervalHours: '24', authorizationConfirmed: false });
+  const [draftProgram, setDraftProgram] = useState(null);
   const [savingSchedule, setSavingSchedule] = useState(false);
 
   useEffect(() => {
@@ -71,15 +72,18 @@ export default function Programs({ selectedProgram, onSelect }) {
 
   const scopeResult = validateScope(testTarget, effectiveProgram);
 
-  useEffect(() => {
-    if (!effectiveProgram) return;
-    const defaultTarget = (effectiveProgram.scope || []).find(rule => !rule.startsWith('*.')) || '';
-    setScheduleDraft({
-      target: effectiveProgram.schedule?.target || defaultTarget,
-      intervalHours: String(effectiveProgram.schedule?.interval_hours || 24),
-      authorizationConfirmed: false,
-    });
-  }, [effectiveProgram]);
+  // Reset before rendering a different program so stale authorization is never shown.
+  if (effectiveProgram !== draftProgram) {
+    setDraftProgram(effectiveProgram);
+    if (effectiveProgram) {
+      const defaultTarget = (effectiveProgram.scope || []).find(rule => !rule.startsWith('*.')) || '';
+      setScheduleDraft({
+        target: effectiveProgram.schedule?.target || defaultTarget,
+        intervalHours: String(effectiveProgram.schedule?.interval_hours || 24),
+        authorizationConfirmed: false,
+      });
+    }
+  }
 
   const create = async event => {
     event.preventDefault();

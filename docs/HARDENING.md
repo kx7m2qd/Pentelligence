@@ -17,6 +17,7 @@ These changes are local until reviewed and published. Existing installations mig
 
 ## Tier 3: correctness and operations
 
+- Nuclei execution failures, missing executables, terminated commands, invalid JSON and hostless runs are incomplete checks, not successful zero-match scans. Host failures propagate to the pipeline/rerun error state while task cleanup still runs. This does not prove that an exit-zero run covered every relevant template or that a template match establishes exploitability; coverage accounting and a richer verification workflow remain follow-ups.
 - sqlmap uses a per-run temporary directory, bulk-target input, and `--results-file` CSV. Text in stdout never proves a vulnerability. Nonzero exits fail the task; rows with notes or another origin are not accepted. Temporary artifacts are removed after parsing.
 - Zod validates all AI response shapes, CVE syntax, port ranges, enumerations and bounded text. Scores are bounded to 0–10. Validation cannot establish that a CVE really exists, so model claims remain suggestions.
 - Existing startup recovery is retained and tested: interrupted `running` scans become `error` with an interruption message and a persisted phase event. The existing status vocabulary stays compatible with History retry.
